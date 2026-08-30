@@ -1,0 +1,28 @@
+[
+  {"marker": "behold", "category": "Focus & Attention", "position": "any"},
+  {"marker": "truly, truly", "category": "Focus & Attention", "position": "any"},
+
+  {"marker": "for", "category": "Logical & Causal", "position": "sentence-initial"},
+  {"marker": "therefore", "category": "Logical & Causal", "position": "any"},
+  {"marker": "thus", "category": "Logical & Causal", "position": "any"},
+  {"marker": "hence", "category": "Logical & Causal", "position": "any"},
+  {"marker": "wherefore", "category": "Logical & Causal", "position": "any"},
+  {"marker": "because", "category": "Logical & Causal", "position": "any"},
+  {"marker": "since", "category": "Logical & Causal", "position": "any"},
+  {"marker": "so that", "category": "Logical & Causal", "position": "any"},
+
+  {"marker": "but god", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "but", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "however", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "nevertheless", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "nonetheless", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "although", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "though", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "yet", "category": "Contrastive & Adversative", "position": "any"},
+  {"marker": "instead", "category": "Contrastive & Adversative", "position": "any"},
+
+  {"marker": "immediately", "category": "Temporal & Sequential", "position": "any"},
+  {"marker": "in those days", "category": "Temporal & Sequential", "position": "any"},
+  {"marker": "now", "category": "Temporal & Sequential", "position": "sentence-initial"},
+  {"marker": "then", "category": "Temporal & Sequential", "position": "sentence-initial"}
+]

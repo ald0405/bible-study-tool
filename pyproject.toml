@@ -1,0 +1,10 @@
+[project]
+name = "bible-study-tool"
+version = "0.1.0"
+description = "Local multi-translation Bible study tool with quotation, discourse, tone, and cross-reference analysis"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "nltk>=3.8",
+    "python-dotenv>=1.0",
+]

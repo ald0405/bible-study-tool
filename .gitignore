@@ -1,0 +1,8 @@
+.env
+data/cache/
+nltk_data/
+.venv/
+__pycache__/
+*.pyc
+.server.pid
+server.log

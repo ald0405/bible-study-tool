@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bible Study Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Bible Study Tool</h1>
+    <form id="search-form" autocomplete="off">
+      <input id="search-input" type="text" placeholder="Search a passage, e.g. Eph 1:1-14, John 3:16, Psalm 23" />
+      <button type="submit">Search Passage</button>
+    </form>
+  </header>
+
+  <main id="app">
+    <div id="empty-state" class="empty-state">
+      <p>Type a reference above to begin — nothing is loaded until you search.</p>
+      <p class="hint">Try: <button class="example" data-ref="John 3:1-21">John 3:1-21</button>
+        <button class="example" data-ref="Ephesians 1">Ephesians 1</button>
+        <button class="example" data-ref="Psalm 23">Psalm 23</button></p>
+    </div>
+
+    <div id="loading-state" class="loading-state hidden">Loading&hellip;</div>
+    <div id="error-state" class="error-state hidden"></div>
+
+    <div id="passage-view" class="passage-view hidden">
+      <h2 id="passage-title"></h2>
+      <div id="translation-picker" class="translation-picker"></div>
+      <div class="content-columns">
+        <div class="reading-grid-wrap"><div id="reading-grid" class="reading-grid"></div></div>
+        <aside class="sidebar">
+          <details class="panel" id="sentiment-panel">
+            <summary>Tone <span class="panel-count" id="sentiment-count"></span></summary>
+            <p class="panel-hint">Overall tone of this passage (VADER lexicon-based &mdash; click a word below to see why)</p>
+            <div id="sentiment-content"></div>
+          </details>
+          <details class="panel" id="terms-panel">
+            <summary>Top Terms <span class="panel-count" id="terms-count"></span></summary>
+            <p class="panel-hint">Repeated words &amp; phrases in this passage (click to trace back to verses)</p>
+            <div id="terms-chart"></div>
+          </details>
+          <details class="panel" id="discourse-panel">
+            <summary>Flow &amp; Structure <span class="panel-count" id="discourse-count"></span></summary>
+            <p class="panel-hint">ESV discourse markers &mdash; words that signal the author's argument (click to jump to a verse)</p>
+            <div id="discourse-list"></div>
+          </details>
+          <details class="panel" id="crossref-panel">
+            <summary>Cross References <span class="panel-count" id="crossref-count"></span></summary>
+            <p class="panel-hint">Click a verse to see related passages, from the ESV's own official cross-reference apparatus. Entries badged "Quotation" are direct quotations — also highlighted inline in the ESV column; others are thematic/verbal parallels.</p>
+            <div id="crossref-list"><p class="muted">No verse selected.</p></div>
+          </details>
+          <details class="panel" id="glossary-panel">
+            <summary>Key Terms in This Passage <span class="panel-count" id="glossary-count"></span></summary>
+            <p class="panel-hint">Click a term to see where it appears</p>
+            <div id="glossary-list"></div>
+          </details>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <div id="tooltip" class="tooltip hidden"></div>
+
+  <footer class="attribution">
+    <p>Scripture quotations marked ESV are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright &copy; 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.</p>
+    <p>The Holy Bible, New International Version® NIV® Copyright &copy; 1973, 1978, 1984, 2011 by Biblica, Inc.® Used by Permission of Biblica, Inc.® All rights reserved worldwide.</p>
+    <p>Cross-references, direct-quotation marking, and words-of-Christ highlighting are Crossway's own ESV Study Bible apparatus, via the ESV API. BSB, NET, and FBV texts via <a href="https://bible.helloao.org/" target="_blank" rel="noopener">bible.helloao.org</a>.</p>
+  </footer>
+
+  <script type="text/javascript" src="https://pkg.api.bible/fumsV3.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
