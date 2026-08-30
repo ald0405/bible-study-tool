@@ -81,6 +81,12 @@ REF_RE = re.compile(
     r"(?:\s*:\s*(\d+)(?:\s*-\s*(\d+))?)?\s*$"
 )
 
+# How many verses of surrounding context to pull in when jumping to a
+# cross-reference or quotation target, so you land in the passage rather
+# than on one verse in isolation. Clamped to the chapter (no cross-chapter
+# padding, same boundary the rest of this app assumes — see README).
+CONTEXT_PAD = 4
+
 
 def parse_reference(raw):
     # ESV's own cross-reference hrefs use an en dash for ranges (e.g. "Joel 2:28–32")
@@ -253,6 +259,13 @@ def build_passage_response(ref):
     esv_result = fetch_esv(ref)
     esv_verses = esv_result["verses"]
 
+    # a padded/context request can ask for a verse_end past the chapter's
+    # actual last verse (e.g. context around a verse near the end); the ESV
+    # API just quietly stops at the real last verse, so clamp here too or
+    # the displayed title would claim verses that were never fetched
+    if ref["verse_end"] and esv_verses:
+        ref["verse_end"] = min(ref["verse_end"], esv_verses[-1]["number"])
+
     translations = {"ESV": esv_verses}
     all_footnotes = []
 
@@ -370,11 +383,18 @@ class Handler(BaseHTTPRequestHandler):
                 if not ref:
                     self._send_json({"error": f"Could not understand reference '{raw}'"}, status=400)
                     return
+                target_verse_start, target_verse_end = ref["verse_start"], ref["verse_end"]
+                if query.get("context", ["0"])[0] == "1" and ref["verse_start"]:
+                    ref["verse_start"] = max(1, ref["verse_start"] - CONTEXT_PAD)
+                    ref["verse_end"] = ref["verse_end"] + CONTEXT_PAD
                 try:
                     payload = build_passage_response(ref)
                 except Exception as exc:  # noqa: BLE001
                     self._send_json({"error": str(exc)}, status=502)
                     return
+                if ref["verse_start"] != target_verse_start or ref["verse_end"] != target_verse_end:
+                    payload["reference"]["target_verse_start"] = target_verse_start
+                    payload["reference"]["target_verse_end"] = target_verse_end
                 self._send_json(payload)
             else:
                 self._send_json({"error": "not found"}, status=404)

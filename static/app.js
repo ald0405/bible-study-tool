@@ -209,7 +209,7 @@ document.addEventListener("click", (e) => {
   if (jumpBtn) {
     e.stopPropagation();
     hideTooltip();
-    loadPassage(jumpBtn.dataset.ref);
+    loadPassage(jumpBtn.dataset.ref, { context: true });
     return;
   }
   const quoteEl = e.target.closest(".ot-quote");
@@ -225,20 +225,29 @@ document.addEventListener("click", (e) => {
   }
 });
 
-async function loadPassage(ref) {
+async function loadPassage(ref, { context } = {}) {
   showState("loading");
   hideTooltip();
   try {
-    const resp = await fetch(`/api/passage?ref=${encodeURIComponent(ref)}`);
+    const url = `/api/passage?ref=${encodeURIComponent(ref)}${context ? "&context=1" : ""}`;
+    const resp = await fetch(url);
     const data = await resp.json();
     if (!resp.ok) {
       throw new Error(data.error || "Something went wrong");
     }
     currentData = data;
-    currentRef = ref; // set before touching location.hash so the hashchange handler below sees it's already loaded
-    location.hash = encodeURIComponent(ref);
+    // use the response's own display form (not the raw input) so a jump that
+    // widened the range to show context reloads/back-navigates to that same
+    // widened range, not back to the single verse in isolation
+    currentRef = data.reference.display;
+    location.hash = encodeURIComponent(currentRef);
     render(data);
     showState("view");
+    if (data.reference.target_verse_start) {
+      selectVerse(data.reference.target_verse_start);
+      const cell = document.querySelector(`.verse-cell[data-verse="${data.reference.target_verse_start}"]`);
+      if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   } catch (err) {
     els.error.textContent = err.message;
     showState("error");
@@ -416,7 +425,7 @@ function renderCrossrefs(num) {
       ${r.preview ? `<div class="cr-preview">“${escapeHtml(r.preview)}” <span class="cr-source">— BSB</span></div>` : ""}
     `;
     btn.addEventListener("click", () => {
-      if (r.refs[0]) loadPassage(r.refs[0]);
+      if (r.refs[0]) loadPassage(r.refs[0], { context: true });
     });
     els.crossrefList.appendChild(btn);
   });
