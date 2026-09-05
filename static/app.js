@@ -66,6 +66,7 @@ let wocByVerse = {}; // verse number -> [{start, end}] — words of Christ
 let sentimentByVerse = {}; // verse number -> [{start, end, kind}] — only populated while the tone toggle is on
 let sentimentToggleOn = false;
 let sections = []; // ordered [{start, end, opener}] — passage broken up at sentence-initial discourse markers
+let sectionHeadings = []; // ordered [{start, end, title}] — real editorial section titles from NIV's publisher
 let structureToggleOn = false;
 
 function escapeHtml(s) {
@@ -315,6 +316,7 @@ function render(data) {
     (discourseByVerse[m.verse] ||= []).push({ start: m.start, end: m.end, category: m.category });
   });
   sections = computeSections(data.translations.ESV, data.discourse_markers || []);
+  sectionHeadings = data.section_headings || [];
 
   citationByVerse = {};
   (data.ot_quotations || []).forEach((q) => {
@@ -740,71 +742,115 @@ function renderDiscourseMarkers(data) {
 // detail (native title tooltip, kept deliberately plain rather than the
 // custom tooltip component so it doesn't need its own dismiss wiring);
 // click to jump, same as the Sections list and the in-grid dividers.
+// One proportional segment shared by both minimap rows: verse range on
+// top, a coloured bar, a label underneath. `range` is {start, end, color,
+// softColor, title, label}; clicking jumps to `range.start` same as the
+// Sections list and the in-grid dividers.
+function buildMinimapSegment(range) {
+  const span = range.end - range.start + 1;
+  const segment = document.createElement("div");
+  segment.className = "minimap-segment";
+  segment.style.flexGrow = span; // proportional by verse count, not pixels
+  segment.style.setProperty("--minimap-color", range.color);
+  segment.style.setProperty("--minimap-bg", range.softColor);
+  segment.title = range.title;
+  segment.addEventListener("click", () => {
+    selectVerse(range.start);
+    const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${range.start}"]`);
+    if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  const verseLabel = document.createElement("div");
+  verseLabel.className = "minimap-range";
+  verseLabel.textContent = range.start === range.end ? `v. ${range.start}` : `vv. ${range.start}-${range.end}`;
+  segment.appendChild(verseLabel);
+
+  const bar = document.createElement("div");
+  bar.className = "minimap-bar";
+  segment.appendChild(bar);
+
+  const label = document.createElement("div");
+  label.className = "minimap-marker";
+  label.textContent = range.label;
+  segment.appendChild(label);
+
+  return segment;
+}
+
 function renderMinimap() {
   const el = els.structureMinimap;
   el.innerHTML = "";
-  if (!structureToggleOn || sections.length <= 1) {
+  const hasHeadings = sectionHeadings.length > 0;
+  const hasSections = sections.length > 1;
+  if (!structureToggleOn || (!hasHeadings && !hasSections)) {
     el.classList.add("hidden");
     return;
   }
   el.classList.remove("hidden");
 
-  const track = document.createElement("div");
-  track.className = "minimap-track";
+  if (hasHeadings) {
+    const rowLabel = document.createElement("div");
+    rowLabel.className = "minimap-row-label";
+    rowLabel.textContent = "Section headings (NIV)";
+    el.appendChild(rowLabel);
 
-  const categoriesSeen = new Map(); // category -> color, in first-seen order (for the legend)
-
-  sections.forEach((section) => {
-    const span = section.end - section.start + 1;
-    const category = section.opener && section.opener.category;
-    const color = categoryColor(category);
-    const softColor = categorySoftColor(category);
-    const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
-
-    const segment = document.createElement("div");
-    segment.className = "minimap-segment";
-    segment.style.flexGrow = span; // proportional by verse count, not pixels
-    segment.style.setProperty("--minimap-color", color);
-    segment.style.setProperty("--minimap-bg", softColor);
-    segment.title = section.opener
-      ? `${verseLabel} — ${section.opener.marker} (${section.opener.category})`
-      : `${verseLabel} — opening`;
-    segment.addEventListener("click", () => {
-      selectVerse(section.start);
-      const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
-      if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
+    const track = document.createElement("div");
+    track.className = "minimap-track";
+    sectionHeadings.forEach((heading) => {
+      const verseLabel = heading.start === heading.end ? `v. ${heading.start}` : `vv. ${heading.start}-${heading.end}`;
+      track.appendChild(buildMinimapSegment({
+        start: heading.start,
+        end: heading.end,
+        color: "var(--accent)",
+        softColor: "var(--accent-soft)",
+        title: `${verseLabel} — ${heading.title}`,
+        label: heading.title,
+      }));
     });
+    el.appendChild(track);
+  }
 
-    const range = document.createElement("div");
-    range.className = "minimap-range";
-    range.textContent = verseLabel;
-    segment.appendChild(range);
+  if (hasSections) {
+    const rowLabel = document.createElement("div");
+    rowLabel.className = "minimap-row-label";
+    rowLabel.textContent = hasHeadings ? "Discourse turns (ESV)" : "Passage structure (ESV)";
+    if (hasHeadings) rowLabel.style.marginTop = "0.6rem";
+    el.appendChild(rowLabel);
 
-    const bar = document.createElement("div");
-    bar.className = "minimap-bar";
-    segment.appendChild(bar);
+    const track = document.createElement("div");
+    track.className = "minimap-track";
+    const categoriesSeen = new Map(); // category -> color, in first-seen order (for the legend)
 
-    const marker = document.createElement("div");
-    marker.className = "minimap-marker";
-    marker.textContent = section.opener ? section.opener.marker : "Opening";
-    segment.appendChild(marker);
+    sections.forEach((section) => {
+      const category = section.opener && section.opener.category;
+      const color = categoryColor(category);
+      const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+      track.appendChild(buildMinimapSegment({
+        start: section.start,
+        end: section.end,
+        color,
+        softColor: categorySoftColor(category),
+        title: section.opener
+          ? `${verseLabel} — ${section.opener.marker} (${section.opener.category})`
+          : `${verseLabel} — opening`,
+        label: section.opener ? section.opener.marker : "Opening",
+      }));
+      if (section.opener && !categoriesSeen.has(section.opener.category)) {
+        categoriesSeen.set(section.opener.category, color);
+      }
+    });
+    el.appendChild(track);
 
-    track.appendChild(segment);
-    if (section.opener && !categoriesSeen.has(section.opener.category)) {
-      categoriesSeen.set(section.opener.category, color);
-    }
-  });
-  el.appendChild(track);
-
-  const legend = document.createElement("div");
-  legend.className = "minimap-legend";
-  categoriesSeen.forEach((color, category) => {
-    const item = document.createElement("span");
-    item.className = "minimap-legend-item";
-    item.innerHTML = `<span class="minimap-swatch" style="background:${color}"></span>${escapeHtml(category)}`;
-    legend.appendChild(item);
-  });
-  el.appendChild(legend);
+    const legend = document.createElement("div");
+    legend.className = "minimap-legend";
+    categoriesSeen.forEach((color, category) => {
+      const item = document.createElement("span");
+      item.className = "minimap-legend-item";
+      item.innerHTML = `<span class="minimap-swatch" style="background:${color}"></span>${escapeHtml(category)}`;
+      legend.appendChild(item);
+    });
+    el.appendChild(legend);
+  }
 }
 
 function clearTermHighlight() {
