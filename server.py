@@ -229,6 +229,32 @@ def slice_range(items, verse_start, verse_end, key="number"):
     return [x for x in items if verse_start <= x[key] <= verse_end]
 
 
+def _parse_verse_org_id(verse_id):
+    """"EPH.2.10" -> (2, 10). api.bible's Section objects give chapter/verse
+    this way rather than as separate fields."""
+    _, chapter, verse = verse_id.split(".")
+    return int(chapter), int(verse)
+
+
+def relevant_section_headings(sections, chapter, verse_start, verse_end):
+    """Editorial section headings (from niv.fetch_sections) that overlap the
+    requested range, clipped to it — a heading can span chapter boundaries
+    (e.g. Eph 4:17-5:20), but this app only ever fetches one chapter at a
+    time, so only the part that falls inside it is worth showing."""
+    result = []
+    for section in sections:
+        first_chapter, first_verse = _parse_verse_org_id(section["first_verse"])
+        last_chapter, last_verse = _parse_verse_org_id(section["last_verse"])
+        if last_chapter < chapter or first_chapter > chapter:
+            continue
+        display_start = verse_start if first_chapter < chapter else max(first_verse, verse_start)
+        display_end = verse_end if last_chapter > chapter else min(last_verse, verse_end)
+        if display_start > display_end:
+            continue
+        result.append({"title": section["title"], "start": display_start, "end": display_end})
+    return result
+
+
 def crossref_preview(target_display, max_len=110):
     """Short BSB preview snippet for a cross-reference target like 'Philippians
     2:9-11', so you can see what the connection actually is without navigating
@@ -315,6 +341,14 @@ def build_passage_response(ref):
     discourse_markers = discourse.find_markers(esv_verses)
     sentiment_result = sentiment.analyze(base_verses)
 
+    # editorial section headings (e.g. "Made Alive in Christ") from NIV's
+    # publisher — always fetched regardless of which translation columns are
+    # ticked on, since this is analysis data, not display text
+    display_start = ref["verse_start"] or 1
+    display_end = ref["verse_end"] or (esv_verses[-1]["number"] if esv_verses else display_start)
+    all_sections = niv.fetch_sections(CONFIG, CACHE_DIR, ref["book_id"])
+    section_headings = relevant_section_headings(all_sections, ref["chapter"], display_start, display_end)
+
     return {
         "reference": {
             "book_id": ref["book_id"],
@@ -333,6 +367,7 @@ def build_passage_response(ref):
         "terms": terms,
         "discourse_markers": discourse_markers,
         "sentiment": sentiment_result,
+        "section_headings": section_headings,
         "fums_token": fums_token,
     }
 

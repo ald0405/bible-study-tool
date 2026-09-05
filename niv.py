@@ -15,6 +15,7 @@ import json
 import os
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -135,3 +136,40 @@ def fetch_chapter(config, cache_dir, book_id, chapter):
         json.dump({"fetched_at": time.time(), **parsed}, f)
 
     return {**parsed, "fums_token": fums_token}
+
+
+def _sections_cache_path(cache_dir, book_id):
+    return os.path.join(cache_dir, "NIV", f"sections_{book_id}.json")
+
+
+def fetch_sections(config, cache_dir, book_id):
+    """Editorial section headings for a book (e.g. "Made Alive in Christ" for
+    Eph 2:1-10), from api.bible's Section objects — a real published outline,
+    not something we're inferring. Not every book has these turned on
+    (Psalms doesn't, at least on our NIV edition), so a 404 just means an
+    empty list rather than an error. Same disk-cache pattern as fetch_chapter."""
+    path = _sections_cache_path(cache_dir, book_id)
+    if os.path.exists(path):
+        with open(path) as f:
+            cached = json.load(f)
+        if time.time() - cached.get("fetched_at", 0) < CACHE_MAX_AGE_SECONDS:
+            return cached["sections"]
+
+    url = f"{API_BASE}/bibles/{config['api_bible_niv_id']}/books/{book_id}/sections"
+    req = urllib.request.Request(url, headers={"api-key": config["api_bible_key"]})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+        sections = [
+            {"title": s["title"], "first_verse": s["firstVerseOrgId"], "last_verse": s["lastVerseOrgId"]}
+            for s in raw.get("data", [])
+        ]
+    except urllib.error.HTTPError as exc:
+        if exc.code != 404:
+            raise
+        sections = []
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({"fetched_at": time.time(), "sections": sections}, f)
+    return sections
