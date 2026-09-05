@@ -34,6 +34,10 @@ const CATEGORY_COLOR_VAR = {
 function categoryColor(category) {
   return `var(${CATEGORY_COLOR_VAR[category] || "--cat-neutral"})`;
 }
+function categorySoftColor(category) {
+  const base = CATEGORY_COLOR_VAR[category] || "--cat-neutral";
+  return `var(${base}-bg)`;
+}
 
 function loadActiveColumns() {
   try {
@@ -745,7 +749,6 @@ function renderMinimap() {
   }
   el.classList.remove("hidden");
 
-  const total = sections[sections.length - 1].end - sections[0].start + 1;
   const track = document.createElement("div");
   track.className = "minimap-track";
 
@@ -753,12 +756,16 @@ function renderMinimap() {
 
   sections.forEach((section) => {
     const span = section.end - section.start + 1;
+    const category = section.opener && section.opener.category;
+    const color = categoryColor(category);
+    const softColor = categorySoftColor(category);
+    const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+
     const segment = document.createElement("div");
     segment.className = "minimap-segment";
-    segment.style.width = `${(span / total) * 100}%`;
-    const color = categoryColor(section.opener && section.opener.category);
-    segment.style.background = color;
-    const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+    segment.style.flexGrow = span; // proportional by verse count, not pixels
+    segment.style.setProperty("--minimap-color", color);
+    segment.style.setProperty("--minimap-bg", softColor);
     segment.title = section.opener
       ? `${verseLabel} — ${section.opener.marker} (${section.opener.category})`
       : `${verseLabel} — opening`;
@@ -767,6 +774,21 @@ function renderMinimap() {
       const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
       if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+
+    const range = document.createElement("div");
+    range.className = "minimap-range";
+    range.textContent = verseLabel;
+    segment.appendChild(range);
+
+    const bar = document.createElement("div");
+    bar.className = "minimap-bar";
+    segment.appendChild(bar);
+
+    const marker = document.createElement("div");
+    marker.className = "minimap-marker";
+    marker.textContent = section.opener ? section.opener.marker : "Opening";
+    segment.appendChild(marker);
+
     track.appendChild(segment);
     if (section.opener && !categoriesSeen.has(section.opener.category)) {
       categoriesSeen.set(section.opener.category, color);

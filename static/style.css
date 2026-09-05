@@ -16,10 +16,15 @@
   --sentiment-neg: #c25b2e;
   --sentiment-neg-bg: #fbe8dc;
   --cat-logical: #2b3a55;
-  --cat-contrastive: #a6822c;
-  --cat-temporal: #3a7a7a;
-  --cat-focus: #7a5c94;
-  --cat-neutral: #9a9ca1;
+  --cat-logical-bg: #e8ebf1;
+  --cat-contrastive: #a8703f;
+  --cat-contrastive-bg: #f3e9dc;
+  --cat-temporal: #3f6e82;
+  --cat-temporal-bg: #e3edf1;
+  --cat-focus: #7d5a83;
+  --cat-focus-bg: #f0e7f0;
+  --cat-neutral: #8a8c90;
+  --cat-neutral-bg: #ececea;
   --serif: "Source Serif 4", "Georgia", "Times New Roman", serif;
   --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", "SF Mono", "Menlo", monospace;
@@ -275,21 +280,52 @@ mark {
 
 .minimap-track {
   display: flex;
-  height: 20px;
-  border-radius: 3px;
-  overflow: hidden;
-  border: 1px solid var(--border);
+  align-items: stretch;
+  gap: 3px;
 }
 
 .minimap-segment {
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0; /* let flex-basis:0 + flex-grow size these purely by verse count */
+  flex-basis: 0;
   cursor: pointer;
-  border-right: 1px solid var(--surface);
-  transition: opacity 0.15s;
 }
 
-.minimap-segment:last-child { border-right: none; }
-.minimap-segment:hover { opacity: 0.7; }
+.minimap-range {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-bottom: 0.2rem;
+}
+
+.minimap-bar {
+  width: 100%;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--minimap-bg, var(--cat-neutral-bg));
+  border-bottom: 3px solid var(--minimap-color, var(--cat-neutral));
+  transition: filter 0.15s;
+}
+
+.minimap-segment:hover .minimap-bar { filter: brightness(0.94); }
+
+.minimap-marker {
+  font-family: var(--sans);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--minimap-color, var(--text-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  margin-top: 0.3rem;
+}
 
 .minimap-legend {
   display: flex;
