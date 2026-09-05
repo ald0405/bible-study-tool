@@ -18,7 +18,22 @@ const els = {
   glossaryList: document.getElementById("glossary-list"),
   sentimentContent: document.getElementById("sentiment-content"),
   tooltip: document.getElementById("tooltip"),
+  structureMinimap: document.getElementById("structure-minimap"),
 };
+
+// one colour per discourse-marker category, shared by the minimap, the
+// in-grid section dividers, and the sidebar Sections list so all three
+// read as the same system; a section with no opener marker (the passage's
+// opening) gets the neutral colour
+const CATEGORY_COLOR_VAR = {
+  "Logical & Causal": "--cat-logical",
+  "Contrastive & Adversative": "--cat-contrastive",
+  "Temporal & Sequential": "--cat-temporal",
+  "Focus & Attention": "--cat-focus",
+};
+function categoryColor(category) {
+  return `var(${CATEGORY_COLOR_VAR[category] || "--cat-neutral"})`;
+}
 
 function loadActiveColumns() {
   try {
@@ -410,6 +425,7 @@ function renderGrid(data) {
     div.className = "structure-divider";
     div.style.gridColumn = `1 / span ${visibleColumns.length}`;
     div.style.gridRow = row;
+    div.style.setProperty("--divider-color", categoryColor(section.opener && section.opener.category));
     div.textContent = section.opener ? `${section.opener.marker} — ${section.opener.category}` : "New section";
     grid.appendChild(div);
   });
@@ -632,11 +648,12 @@ function renderSections() {
 
   sections.forEach((section) => {
     const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+    const swatch = `<span class="minimap-swatch" style="background:${categoryColor(section.opener && section.opener.category)}"></span>`;
     const btn = document.createElement("button");
     btn.className = "discourse-item";
     btn.innerHTML = section.opener
-      ? `<span class="d-marker">${escapeHtml(section.opener.marker.toLowerCase())} <span class="muted">(${escapeHtml(section.opener.category)})</span></span><span class="d-verse">${verseLabel}</span>`
-      : `<span class="d-marker">Opening</span><span class="d-verse">${verseLabel}</span>`;
+      ? `<span class="d-marker">${swatch}${escapeHtml(section.opener.marker.toLowerCase())} <span class="muted">(${escapeHtml(section.opener.category)})</span></span><span class="d-verse">${verseLabel}</span>`
+      : `<span class="d-marker">${swatch}Opening</span><span class="d-verse">${verseLabel}</span>`;
     btn.addEventListener("click", () => {
       selectVerse(section.start);
       const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
@@ -652,6 +669,7 @@ function renderDiscourseMarkers(data) {
   if (hits.length === 0) {
     els.discourseList.innerHTML = '<p class="muted">No discourse markers found in this passage.</p>';
     setPanelCount("discourse-count", 0);
+    renderMinimap();
     return;
   }
 
@@ -708,6 +726,63 @@ function renderDiscourseMarkers(data) {
       els.discourseList.appendChild(btn);
     });
   });
+
+  renderMinimap();
+}
+
+// Proportional, colour-coded overview bar above the reading grid — shows
+// the whole passage's shape at a glance (which sections it breaks into,
+// by category colour) without reading every divider. Hover a segment for
+// detail (native title tooltip, kept deliberately plain rather than the
+// custom tooltip component so it doesn't need its own dismiss wiring);
+// click to jump, same as the Sections list and the in-grid dividers.
+function renderMinimap() {
+  const el = els.structureMinimap;
+  el.innerHTML = "";
+  if (!structureToggleOn || sections.length <= 1) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+
+  const total = sections[sections.length - 1].end - sections[0].start + 1;
+  const track = document.createElement("div");
+  track.className = "minimap-track";
+
+  const categoriesSeen = new Map(); // category -> color, in first-seen order (for the legend)
+
+  sections.forEach((section) => {
+    const span = section.end - section.start + 1;
+    const segment = document.createElement("div");
+    segment.className = "minimap-segment";
+    segment.style.width = `${(span / total) * 100}%`;
+    const color = categoryColor(section.opener && section.opener.category);
+    segment.style.background = color;
+    const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+    segment.title = section.opener
+      ? `${verseLabel} — ${section.opener.marker} (${section.opener.category})`
+      : `${verseLabel} — opening`;
+    segment.addEventListener("click", () => {
+      selectVerse(section.start);
+      const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
+      if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    track.appendChild(segment);
+    if (section.opener && !categoriesSeen.has(section.opener.category)) {
+      categoriesSeen.set(section.opener.category, color);
+    }
+  });
+  el.appendChild(track);
+
+  const legend = document.createElement("div");
+  legend.className = "minimap-legend";
+  categoriesSeen.forEach((color, category) => {
+    const item = document.createElement("span");
+    item.className = "minimap-legend-item";
+    item.innerHTML = `<span class="minimap-swatch" style="background:${color}"></span>${escapeHtml(category)}`;
+    legend.appendChild(item);
+  });
+  el.appendChild(legend);
 }
 
 function clearTermHighlight() {
