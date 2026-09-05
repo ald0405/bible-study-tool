@@ -46,6 +46,8 @@ let citationByVerse = {}; // verse number -> [{start, end, refs, title}] — dir
 let wocByVerse = {}; // verse number -> [{start, end}] — words of Christ
 let sentimentByVerse = {}; // verse number -> [{start, end, kind}] — only populated while the tone toggle is on
 let sentimentToggleOn = false;
+let sections = []; // ordered [{start, end, opener}] — passage broken up at sentence-initial discourse markers
+let structureToggleOn = false;
 
 function escapeHtml(s) {
   const div = document.createElement("div");
@@ -161,6 +163,38 @@ function buildSentimentByVerse(esvVerses) {
   return map;
 }
 
+// Breaks the passage into ordered sections at each verse whose earliest
+// sentence-initial discourse-marker hit opens a new clause — e.g. a
+// sentence-initial "But" or "Therefore" marks a real turn in the argument,
+// while the same word buried mid-sentence doesn't. The first section never
+// gets a divider (there's nothing before it to divide from); an `opener` of
+// null there just means the passage doesn't open on a marker.
+function computeSections(esvVerses, hits) {
+  if (!esvVerses || esvVerses.length === 0) return [];
+  const openerByVerse = {};
+  hits.forEach((h) => {
+    if (!h.sentence_initial) return;
+    const existing = openerByVerse[h.verse];
+    if (!existing || h.start < existing.start) openerByVerse[h.verse] = h;
+  });
+  const nums = esvVerses.map((v) => v.number).sort((a, b) => a - b);
+  const result = [];
+  let current = null;
+  nums.forEach((num, idx) => {
+    const opener = openerByVerse[num];
+    if (idx === 0) {
+      current = { start: num, end: num, opener: opener || null };
+    } else if (opener) {
+      result.push(current);
+      current = { start: num, end: num, opener };
+    } else {
+      current.end = num;
+    }
+  });
+  if (current) result.push(current);
+  return result;
+}
+
 function renderEsvCellText(el) {
   const text = el.dataset.original;
   const verseNum = Number(el.closest(".verse-cell").dataset.verse);
@@ -261,6 +295,7 @@ function render(data) {
   (data.discourse_markers || []).forEach((m) => {
     (discourseByVerse[m.verse] ||= []).push({ start: m.start, end: m.end, category: m.category });
   });
+  sections = computeSections(data.translations.ESV, data.discourse_markers || []);
 
   citationByVerse = {};
   (data.ot_quotations || []).forEach((q) => {
@@ -336,7 +371,24 @@ function renderGrid(data) {
   if (allNumbers.size === 0) return;
   const minV = Math.min(...allNumbers);
   const maxV = Math.max(...allNumbers);
-  grid.style.gridTemplateRows = `auto repeat(${maxV - minV + 1}, auto)`;
+
+  // normally one grid row per verse; with structure view on, reserve an
+  // extra row before each section (after the first) for a divider bar
+  const rowByVerse = {};
+  const dividers = []; // {row, section}
+  let rowCursor = 2; // row 1 is the column headers
+  if (structureToggleOn && sections.length > 1) {
+    sections.forEach((section, i) => {
+      if (i > 0) {
+        dividers.push({ row: rowCursor, section });
+        rowCursor++;
+      }
+      for (let n = section.start; n <= section.end; n++) rowByVerse[n] = rowCursor++;
+    });
+  } else {
+    for (let n = minV; n <= maxV; n++) rowByVerse[n] = rowCursor++;
+  }
+  grid.style.gridTemplateRows = `auto repeat(${rowCursor - 2}, auto)`;
   // set dynamically rather than in CSS — fewer active translations means
   // each gets more width instead of leaving the freed columns blank
   grid.style.gridTemplateColumns = `repeat(${visibleColumns.length}, minmax(180px, 1fr))`;
@@ -353,6 +405,15 @@ function renderGrid(data) {
     grid.appendChild(h);
   });
 
+  dividers.forEach(({ row, section }) => {
+    const div = document.createElement("div");
+    div.className = "structure-divider";
+    div.style.gridColumn = `1 / span ${visibleColumns.length}`;
+    div.style.gridRow = row;
+    div.textContent = section.opener ? `${section.opener.marker} — ${section.opener.category}` : "New section";
+    grid.appendChild(div);
+  });
+
   visibleColumns.forEach((c, colIdx) => {
     data.translations[c].forEach((v) => {
       const cell = document.createElement("div");
@@ -360,7 +421,7 @@ function renderGrid(data) {
       cell.dataset.col = c;
       cell.dataset.verse = v.number;
       cell.style.gridColumn = colIdx + 1;
-      cell.style.gridRow = v.number - minV + 2;
+      cell.style.gridRow = rowByVerse[v.number];
       if (colIdx === lastColIdx) cell.style.borderRight = "none";
 
       const badge = document.createElement("span");
@@ -556,6 +617,35 @@ function renderSentimentWordList(container, label, words, polarity) {
   });
 }
 
+function renderSections() {
+  if (sections.length <= 1) {
+    const note = document.createElement("p");
+    note.className = "muted";
+    note.textContent = "No structural breaks detected in this passage.";
+    els.discourseList.appendChild(note);
+    return;
+  }
+  const heading = document.createElement("div");
+  heading.className = "discourse-category";
+  heading.textContent = "Sections";
+  els.discourseList.appendChild(heading);
+
+  sections.forEach((section) => {
+    const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+    const btn = document.createElement("button");
+    btn.className = "discourse-item";
+    btn.innerHTML = section.opener
+      ? `<span class="d-marker">${escapeHtml(section.opener.marker.toLowerCase())} <span class="muted">(${escapeHtml(section.opener.category)})</span></span><span class="d-verse">${verseLabel}</span>`
+      : `<span class="d-marker">Opening</span><span class="d-verse">${verseLabel}</span>`;
+    btn.addEventListener("click", () => {
+      selectVerse(section.start);
+      const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
+      if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    els.discourseList.appendChild(btn);
+  });
+}
+
 function renderDiscourseMarkers(data) {
   els.discourseList.innerHTML = "";
   const hits = data.discourse_markers || [];
@@ -564,6 +654,22 @@ function renderDiscourseMarkers(data) {
     setPanelCount("discourse-count", 0);
     return;
   }
+
+  const toggleRow = document.createElement("label");
+  toggleRow.className = "toggle-row";
+  const toggleInput = document.createElement("input");
+  toggleInput.type = "checkbox";
+  toggleInput.checked = structureToggleOn;
+  toggleInput.addEventListener("change", () => {
+    structureToggleOn = toggleInput.checked;
+    renderGrid(currentData);
+    renderDiscourseMarkers(currentData);
+  });
+  toggleRow.appendChild(toggleInput);
+  toggleRow.append("Show passage structure");
+  els.discourseList.appendChild(toggleRow);
+
+  if (structureToggleOn) renderSections();
 
   // group case-insensitively by (category, word) — "But" (v.4) and "but"
   // (v.6) are the same marker and should list once with both verses, not

@@ -240,6 +240,19 @@ mark {
   cursor: help;
 }
 
+.structure-divider {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 0.4rem 1.1rem;
+  border-top: 2px solid var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+
 .ot-quote {
   font-style: italic;
   border-bottom: 2px solid var(--accent);

@@ -21,9 +21,18 @@ _MARKERS_BY_LENGTH = sorted(_MARKERS, key=lambda m: -len(m["marker"]))
 _QUOTE_CHARS = "\"'‘’“”"
 
 
-def _is_sentence_initial(text, start):
+def _is_sentence_initial(text, start, prev_tail=None):
+    """prev_tail is the last non-whitespace/quote character of the previous
+    verse's text (None if this is the first verse in the request). Verses in
+    the ESV routinely end mid-sentence (e.g. Eph 2:6 ends "...in Christ
+    Jesus," with v.7 continuing "so that..."), so a marker sitting at the
+    very start of a verse's own text is only truly sentence-initial if the
+    previous verse actually ended a sentence there — checking within one
+    verse's text alone would treat every verse boundary as a sentence break."""
     prefix = text[:start].rstrip().rstrip(_QUOTE_CHARS).rstrip()
-    return prefix == "" or prefix[-1] in ".;!?"
+    if prefix:
+        return prefix[-1] in ".;!?"
+    return prev_tail is None or prev_tail in ".;!?"
 
 
 def find_markers(verses):
@@ -31,6 +40,7 @@ def find_markers(verses):
     by verse then position, each with character offsets into that verse's text
     so the frontend can highlight the exact span without re-matching."""
     hits = []
+    prev_tail = None
     for v in verses:
         text = v["text"]
         claimed = []
@@ -40,7 +50,8 @@ def find_markers(verses):
                 start, end = match.start(), match.end()
                 if any(start < c_end and end > c_start for c_start, c_end in claimed):
                     continue
-                if marker_def["position"] == "sentence-initial" and not _is_sentence_initial(text, start):
+                sentence_initial = _is_sentence_initial(text, start, prev_tail)
+                if marker_def["position"] == "sentence-initial" and not sentence_initial:
                     continue
                 claimed.append((start, end))
                 hits.append({
@@ -49,6 +60,13 @@ def find_markers(verses):
                     "verse": v["number"],
                     "start": start,
                     "end": end,
+                    # true when this occurrence opens a sentence, regardless of
+                    # the marker's declared position — the signal used to turn
+                    # marker hits into passage sections (see app.js computeSections)
+                    "sentence_initial": sentence_initial,
                 })
+        trimmed = text.rstrip().rstrip(_QUOTE_CHARS).rstrip()
+        if trimmed:
+            prev_tail = trimmed[-1]
     hits.sort(key=lambda h: (h["verse"], h["start"]))
     return hits
