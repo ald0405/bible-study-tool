@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .server.pid
 server.log
+data/summary_requests/
