@@ -639,6 +639,14 @@ mark {
   white-space: nowrap;
 }
 
+/* parallels are the weaker claim of the two, so they get the badge shape
+   without the accent colour competing with a real quotation */
+.cr-badge-parallel {
+  color: var(--text-muted);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
 .cr-preview {
   margin-top: 0.25rem;
   font-family: var(--serif);
@@ -725,6 +733,114 @@ mark {
 }
 
 .attribution a { color: var(--accent); }
+
+/* --- Summary panel ------------------------------------------------------- */
+
+.summary-block { margin-bottom: 1rem; }
+.summary-block:last-of-type { margin-bottom: 0.5rem; }
+
+/* the punchiest thing in the sidebar, so it gets the accent rule and the
+   serif — it reads as a claim, not as another list row */
+.summary-purpose {
+  margin: 0 0 0.5rem;
+  padding-left: 0.65rem;
+  border-left: 2px solid var(--accent);
+  font-family: var(--serif);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.summary-section,
+.summary-theme,
+.summary-reference {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  margin-bottom: 0.25rem;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.summary-section { cursor: pointer; }
+.summary-theme.clickable,
+.summary-reference.clickable { cursor: pointer; }
+
+.summary-section:hover,
+.summary-theme.clickable:hover,
+.summary-reference.clickable:hover { background: var(--accent-soft); }
+
+.summary-block .s-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.summary-block .s-title {
+  font-weight: 600;
+  color: var(--link);
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.summary-block .s-line {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.summary-run {
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--surface);
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+
+.summary-run:hover { filter: brightness(1.15); }
+.summary-run:disabled { opacity: 0.6; cursor: default; }
+
+.summary-waiting {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.summary-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.summary-note code {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 0.05rem 0.25rem;
+}
+
+.summary-footer {
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-style: italic;
+}
 
 @media (max-width: 900px) {
   .content-columns { flex-direction: column; }

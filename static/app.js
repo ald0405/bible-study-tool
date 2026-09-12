@@ -17,6 +17,8 @@ const els = {
   crossrefList: document.getElementById("crossref-list"),
   glossaryList: document.getElementById("glossary-list"),
   sentimentContent: document.getElementById("sentiment-content"),
+  summaryContent: document.getElementById("summary-content"),
+  summaryCount: document.getElementById("summary-count"),
   tooltip: document.getElementById("tooltip"),
   structureMinimap: document.getElementById("structure-minimap"),
 };
@@ -68,6 +70,8 @@ let sentimentToggleOn = false;
 let sections = []; // ordered [{start, end, opener}] — passage broken up at sentence-initial discourse markers
 let sectionHeadings = []; // ordered [{start, end, title}] — real editorial section titles from NIV's publisher
 let structureToggleOn = false;
+let summaryPollTimer = null; // cleared on every render, so a poll left over from
+                             // the previous passage can't write into the new one
 
 function escapeHtml(s) {
   const div = document.createElement("div");
@@ -310,6 +314,7 @@ async function loadPassage(ref, { context } = {}) {
 
 function render(data) {
   els.title.textContent = data.reference.display;
+  stopSummaryPolling();
 
   discourseByVerse = {};
   (data.discourse_markers || []).forEach((m) => {
@@ -337,6 +342,7 @@ function render(data) {
   renderDiscourseMarkers(data);
   renderSentiment(data);
   renderGlossary(data);
+  renderSummary(data);
   els.crossrefList.innerHTML = '<p class="muted">Click a verse to see related passages.</p>';
   const crossrefTotal = Object.values(data.cross_references || {}).reduce((sum, refs) => sum + refs.length, 0);
   setPanelCount("crossref-count", crossrefTotal);
@@ -898,6 +904,221 @@ function setActiveHighlight(rowEl, regex, verseNumbers) {
     rowEl.classList.add("active");
     applyHighlightRegex(regex, verseNumbers);
   }
+}
+
+// --- Summary panel ----------------------------------------------------------
+// The one panel that isn't computed locally: it's written by Claude from the
+// metadata every other panel already shows. With no ANTHROPIC_API_KEY set, the
+// server answers Run by writing data/summary_requests/<KEY>.json and a Claude
+// Code session fills it in with /summarise — so after pressing Run we poll for
+// the answer to land rather than blocking on a response.
+
+const SUMMARY_POLL_MS = 3000;
+const SUMMARY_POLL_GIVE_UP_MS = 10 * 60 * 1000;
+
+function stopSummaryPolling() {
+  if (summaryPollTimer) {
+    clearInterval(summaryPollTimer);
+    summaryPollTimer = null;
+  }
+}
+
+function setSummaryCount(text) {
+  els.summaryCount.textContent = text;
+}
+
+async function fetchSummaryStatus(ref) {
+  const resp = await fetch(`/api/summary?ref=${encodeURIComponent(ref)}`);
+  return resp.json();
+}
+
+function renderSummary(data) {
+  stopSummaryPolling();
+  const ref = data.reference.display;
+  els.summaryContent.innerHTML = '<p class="muted">Checking…</p>';
+  setSummaryCount("");
+
+  fetchSummaryStatus(ref)
+    .then((result) => applySummaryStatus(ref, result))
+    .catch(() => {
+      els.summaryContent.innerHTML = '<p class="muted">Could not reach the summary service.</p>';
+    });
+}
+
+function applySummaryStatus(ref, result) {
+  if (ref !== currentRef) return; // a different passage loaded while we were waiting
+  if (result.status === "ready") {
+    stopSummaryPolling();
+    renderSummaryContent(result.summary);
+  } else if (result.status === "pending") {
+    renderSummaryPending(ref, result.request_file);
+  } else {
+    renderSummaryRunPrompt(ref);
+  }
+}
+
+function renderSummaryRunPrompt(ref) {
+  setSummaryCount("not run");
+  els.summaryContent.innerHTML = "";
+
+  const btn = document.createElement("button");
+  btn.className = "summary-run";
+  btn.textContent = "Run summary";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Requesting…";
+    try {
+      const resp = await fetch(`/api/summary?ref=${encodeURIComponent(ref)}`, { method: "POST" });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || "Could not request a summary");
+      applySummaryStatus(ref, result);
+    } catch (err) {
+      els.summaryContent.innerHTML = `<p class="muted">${escapeHtml(err.message)}</p>`;
+    }
+  });
+  els.summaryContent.appendChild(btn);
+
+  const note = document.createElement("p");
+  note.className = "summary-note";
+  note.innerHTML =
+    'Costs nothing until you press it. Without an <code>ANTHROPIC_API_KEY</code> this writes a request ' +
+    'to disk for you to answer with <code>/summarise</code> in Claude Code.';
+  els.summaryContent.appendChild(note);
+}
+
+function renderSummaryPending(ref, requestFile) {
+  setSummaryCount("waiting");
+  const fileNote = requestFile
+    ? `<p class="summary-note">Request written to <code>${escapeHtml(requestFile)}</code>.</p>`
+    : "";
+  els.summaryContent.innerHTML =
+    '<p class="summary-waiting">Waiting for Claude…</p>' +
+    fileNote +
+    '<p class="summary-note">Run <code>/summarise</code> in Claude Code. This panel fills itself in — no need to reload.</p>';
+
+  if (summaryPollTimer) return;
+  const startedAt = Date.now();
+  summaryPollTimer = setInterval(async () => {
+    if (ref !== currentRef) {
+      stopSummaryPolling();
+      return;
+    }
+    if (Date.now() - startedAt > SUMMARY_POLL_GIVE_UP_MS) {
+      stopSummaryPolling();
+      setSummaryCount("waiting");
+      els.summaryContent.innerHTML =
+        '<p class="summary-note">Still waiting. Run <code>/summarise</code> in Claude Code, then search this passage again.</p>';
+      return;
+    }
+    try {
+      const result = await fetchSummaryStatus(ref);
+      if (result.status === "ready") applySummaryStatus(ref, result);
+    } catch {
+      // a failed poll is not worth surfacing — the next one is 3s away
+    }
+  }, SUMMARY_POLL_MS);
+}
+
+function summaryBlock(title) {
+  const block = document.createElement("div");
+  block.className = "summary-block";
+  const heading = document.createElement("div");
+  heading.className = "discourse-category";
+  heading.textContent = title;
+  block.appendChild(heading);
+  return block;
+}
+
+function jumpToVerse(num) {
+  selectVerse(num);
+  const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${num}"]`);
+  if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function renderSummaryContent(summary) {
+  stopSummaryPolling();
+  setSummaryCount("ready");
+  els.summaryContent.innerHTML = "";
+
+  // Purpose first: these are the point of the panel, so they shouldn't be
+  // three scrolls down past the section list.
+  if ((summary.purpose || []).length) {
+    const block = summaryBlock("Why this was written");
+    summary.purpose.forEach((line) => {
+      const p = document.createElement("p");
+      p.className = "summary-purpose";
+      p.textContent = line;
+      block.appendChild(p);
+    });
+    els.summaryContent.appendChild(block);
+  }
+
+  if ((summary.sections || []).length) {
+    const block = summaryBlock("Sections");
+    summary.sections.forEach((s) => {
+      const label = s.start === s.end ? `v. ${s.start}` : `vv. ${s.start}-${s.end}`;
+      const btn = document.createElement("button");
+      btn.className = "summary-section";
+      btn.innerHTML =
+        `<span class="s-head"><span class="s-title">${escapeHtml(s.title)}</span><span class="d-verse">${label}</span></span>` +
+        `<span class="s-line">${escapeHtml(s.line || "")}</span>`;
+      btn.addEventListener("click", () => jumpToVerse(s.start));
+      block.appendChild(btn);
+    });
+    els.summaryContent.appendChild(block);
+  }
+
+  if ((summary.themes || []).length) {
+    const block = summaryBlock("Recurring themes");
+    summary.themes.forEach((t) => {
+      const verses = (t.verses || []).length ? `vv. ${t.verses.join(", ")}` : "";
+      const entry = document.createElement("div");
+      entry.className = "summary-theme";
+      entry.innerHTML =
+        `<div class="s-head"><span class="s-title">${escapeHtml(t.theme)}</span><span class="d-verse">${verses}</span></div>` +
+        `<div class="s-line">${escapeHtml(t.note || "")}</div>`;
+      // same click-to-highlight contract as the glossary entries, driven by
+      // the theme's triggers rather than a curated term's
+      const triggers = (t.triggers || []).filter(Boolean);
+      if (triggers.length) {
+        entry.classList.add("clickable");
+        entry.addEventListener("click", () => {
+          const pattern = triggers.map(escapeRegExp).join("|");
+          setActiveHighlight(entry, new RegExp(`\\b(${pattern})\\b`, "gi"), t.verses || []);
+        });
+      }
+      block.appendChild(entry);
+    });
+    els.summaryContent.appendChild(block);
+  }
+
+  if ((summary.references || []).length) {
+    const block = summaryBlock("Scripture it reaches for");
+    summary.references.forEach((r) => {
+      // same badge as the Cross References panel, so a quotation reads as the
+      // same kind of thing in both places
+      const badge = r.kind === "quotation"
+        ? '<span class="cr-quote-badge">Quotation</span>'
+        : '<span class="cr-quote-badge cr-badge-parallel">Parallel</span>';
+      const verses = (r.verses || []).length ? `at vv. ${r.verses.join(", ")}` : "";
+      const entry = document.createElement("div");
+      entry.className = "summary-reference";
+      entry.innerHTML =
+        `<div class="s-head"><span class="s-title">${escapeHtml(r.ref)}${badge}</span><span class="d-verse">${verses}</span></div>` +
+        `<div class="s-line">${escapeHtml(r.why || "")}</div>`;
+      if ((r.verses || []).length) {
+        entry.classList.add("clickable");
+        entry.addEventListener("click", () => jumpToVerse(r.verses[0]));
+      }
+      block.appendChild(entry);
+    });
+    els.summaryContent.appendChild(block);
+  }
+
+  const footer = document.createElement("p");
+  footer.className = "summary-note summary-footer";
+  footer.textContent = "Written by Claude from the analysis on this page — interpretation, not data.";
+  els.summaryContent.appendChild(footer);
 }
 
 function renderGlossary(data) {

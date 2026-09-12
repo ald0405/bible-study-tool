@@ -1,0 +1,150 @@
+{
+  "reference": "Romans 4",
+  "generated_at": 1789209075.9048572,
+  "sections": [
+    {
+      "title": "Abraham had nothing to boast about",
+      "start": 1,
+      "end": 5,
+      "line": "Credited, not earned \u2014 the wage-versus-gift distinction does the work."
+    },
+    {
+      "title": "David says the same thing",
+      "start": 6,
+      "end": 8,
+      "line": "A second witness, and this one speaks of sin not counted."
+    },
+    {
+      "title": "Before circumcision, not after",
+      "start": 9,
+      "end": 12,
+      "line": "The timing is the argument: faith came first, so Gentiles are included."
+    },
+    {
+      "title": "Promise, not law",
+      "start": 13,
+      "end": 17,
+      "line": "Law can only bring wrath; a promise can rest on grace."
+    },
+    {
+      "title": "Faith against the evidence",
+      "start": 18,
+      "end": 22,
+      "line": "Two dead bodies, one promise, and Abraham believes anyway."
+    },
+    {
+      "title": "Written for us",
+      "start": 23,
+      "end": 25,
+      "line": "The Genesis sentence was always aimed past Abraham at the reader."
+    }
+  ],
+  "themes": [
+    {
+      "theme": "Credited, not earned",
+      "note": "A bookkeeping word, repeated until the accounting is unmistakable.",
+      "verses": [
+        3,
+        4,
+        5,
+        6,
+        9,
+        10,
+        11,
+        22,
+        23,
+        24
+      ],
+      "triggers": [
+        "credited",
+        "counted",
+        "count against"
+      ]
+    },
+    {
+      "theme": "Faith before circumcision",
+      "note": "Sequence is the proof: the sign came after the righteousness.",
+      "verses": [
+        9,
+        10,
+        11,
+        12
+      ],
+      "triggers": [
+        "circumcised",
+        "uncircumcised",
+        "circumcision"
+      ]
+    },
+    {
+      "theme": "Father of us all",
+      "note": "Abraham widens from one nation's ancestor to everyone who believes.",
+      "verses": [
+        11,
+        12,
+        16,
+        17,
+        18
+      ],
+      "triggers": [
+        "father"
+      ]
+    },
+    {
+      "theme": "Promise over law",
+      "note": "A promise rests on grace, so it can actually be guaranteed.",
+      "verses": [
+        13,
+        14,
+        15,
+        16,
+        20,
+        21
+      ],
+      "triggers": [
+        "promise",
+        "law"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "ref": "Genesis 15:6",
+      "verses": [
+        3,
+        22
+      ],
+      "kind": "quotation",
+      "why": "The verse the whole chapter turns on \u2014 Paul reads 'credited' as accounting language and builds the case on it."
+    },
+    {
+      "ref": "Psalm 32:1\u20132",
+      "verses": [
+        7
+      ],
+      "kind": "quotation",
+      "why": "Brings David in as a second witness, and states the same thing negatively: sin not counted."
+    },
+    {
+      "ref": "Genesis 17:5",
+      "verses": [
+        17
+      ],
+      "kind": "quotation",
+      "why": "God renamed Abraham father of many nations before he had a son, so the promise always outran the evidence."
+    },
+    {
+      "ref": "Genesis 15:5",
+      "verses": [
+        18
+      ],
+      "kind": "quotation",
+      "why": "The stars promise, cited to show what Abraham was believing against a hundred-year-old body."
+    }
+  ],
+  "purpose": [
+    "Paul wants us to know Abraham was justified before he was circumcised, so that Gentile believers are not second-tier children.",
+    "He wants us to believe righteousness is credited rather than earned, because a wage can be claimed but a gift can only be received.",
+    "He wants us to read Genesis as written for us, so that the same faith that answered a dead womb can answer an empty tomb."
+  ]
+}
