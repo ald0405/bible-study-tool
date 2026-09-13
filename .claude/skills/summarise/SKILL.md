@@ -18,6 +18,11 @@ for you to fill it in.
      headings, repeated terms, sentence-initial discourse markers, the ESV's
      cross-reference apparatus with direct quotations flagged, glossary hits,
      and the overall tone label.
+   - Every verse is identified by a **verse id**, `"chapter:verse"` (e.g.
+     `"2:10"`), because a passage can span chapters and verse numbers restart
+     at each boundary. `verse_ids` in the bundle is the reading order. Use
+     these ids verbatim everywhere the schema asks for a verse — never a bare
+     number, even in a single-chapter passage.
    - Write the summary to `data/summaries/<KEY>.json` in the schema below.
    - Delete the request file.
 3. Report which passages you wrote. The browser polls every few seconds, so the
@@ -32,15 +37,16 @@ Do all pending requests in one pass, not just the first.
   "reference": "Ephesians 1:1-14",
   "generated_at": 1788600000,
   "sections": [
-    { "title": "Chosen before the foundation", "start": 3, "end": 6,
+    { "title": "Chosen before the foundation", "start": "1:3", "end": "1:6",
       "line": "Election framed as praise, not as a puzzle." }
   ],
   "themes": [
     { "theme": "In Christ", "note": "Every blessing is located in him, never alongside him.",
-      "verses": [3, 4, 7, 11, 13], "triggers": ["in Christ", "in him", "in whom"] }
+      "verses": ["1:3", "1:4", "1:7", "1:11", "1:13"],
+      "triggers": ["in Christ", "in him", "in whom"] }
   ],
   "references": [
-    { "ref": "Psalm 68:18", "verses": [8], "kind": "quotation",
+    { "ref": "Psalm 68:18", "verses": ["1:8"], "kind": "quotation",
       "why": "Recasts a victory procession so the spoils become gifts to the church." }
   ],
   "purpose": [
@@ -56,9 +62,10 @@ Do all pending requests in one pass, not just the first.
 **Sections — 3 to 5.** The argument's real movements. Use the publisher's
 headings and the discourse-marker breaks as *evidence*, but override them where
 the argument plainly moves somewhere else; the panel exists precisely because
-publisher headings aren't always the structure. `start`/`end` must be verse
-numbers present in the bundle, and the sections should tile the passage in order
-without gaps or overlaps. `line` ≤ 15 words.
+publisher headings aren't always the structure. `start`/`end` must be verse ids
+present in `verse_ids`, and the sections should tile the passage in order
+without gaps or overlaps — across a chapter boundary too, where a section may
+legitimately run from e.g. `"1:20"` to `"2:3"`. `line` ≤ 15 words.
 
 **Themes — 3 to 4.** What actually recurs, not what a chapter on this topic
 usually contains. The `repeated_terms` list is a strong hint but not the answer:
@@ -83,6 +90,10 @@ them land. ≤ 30 words each.
 
 - Ground everything in the supplied verses and metadata. If the bundle doesn't
   support a claim, don't make it.
+- When `spans_chapters` is true, the passage crosses a chapter boundary. Treat
+  it as one continuous argument: the boundary is a printer's convention, not a
+  break the author made, and the sections should follow the argument across it
+  rather than stopping at it.
 - Name the author as the text and tradition do (Paul, John, the Chronicler,
   the psalmist). Where authorship is genuinely disputed, say "the author".
 - Describe what the text claims, in its own voice. This is a study tool: report

@@ -264,6 +264,22 @@ mark {
   border-left: 4px solid var(--divider-color, var(--accent));
 }
 
+/* A chapter boundary is a bigger event than a discourse turn, so it reads
+   heavier than .structure-divider: the book and chapter spelled out, on the
+   full accent rather than the soft wash. Always shown when a passage spans
+   chapters, independent of the structure toggle. */
+.chapter-divider {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--surface);
+  background: var(--accent);
+  padding: 0.5rem 1.1rem 0.5rem 0.9rem;
+  margin-top: 0.4rem;
+}
+
 /* Passage structure minimap — a proportional, colour-coded overview bar
    above the reading grid. Sticky so it stays visible while scrolling a
    long passage, since that's when a shape-at-a-glance view is most useful. */

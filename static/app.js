@@ -73,6 +73,45 @@ let structureToggleOn = false;
 let summaryPollTimer = null; // cleared on every render, so a poll left over from
                              // the previous passage can't write into the new one
 
+// A verse is identified by "chapter:verse" (e.g. "2:10"), because verse numbers
+// restart at every chapter boundary. `verseIds` is the passage's reading order
+// as sent by the server; `versePosition` turns an id into its index, and all
+// span/proportion arithmetic goes through it rather than through verse numbers.
+let verseIds = [];
+let versePosition = {};
+let spansChapters = false;
+
+function verseChapter(id) {
+  return id.split(":")[0];
+}
+
+// Within a single chapter the chapter number is noise, so labels stay "v. 14"
+// as they always were; across chapters they have to carry it: "1:20".
+function verseLabel(id) {
+  return spansChapters ? id : id.split(":")[1];
+}
+
+function formatRange(startId, endId) {
+  return startId === endId
+    ? `v. ${verseLabel(startId)}`
+    : `vv. ${verseLabel(startId)}-${verseLabel(endId)}`;
+}
+
+function formatVerseList(ids) {
+  return `vv. ${ids.map(verseLabel).join(", ")}`;
+}
+
+function inReadingOrder(ids) {
+  return [...ids].sort((a, b) => versePosition[a] - versePosition[b]);
+}
+
+// Summaries written before multi-chapter support used bare verse numbers; a
+// bare number belongs to the passage's opening chapter.
+function toVerseId(value) {
+  const raw = String(value);
+  return raw.includes(":") ? raw : `${verseChapter(verseIds[0] || "1:1")}:${raw}`;
+}
+
 function escapeHtml(s) {
   const div = document.createElement("div");
   div.textContent = s;
@@ -144,14 +183,14 @@ function subtractRanges(base, subtract) {
 // (not a text-color/underline change like the others), so rather than a
 // full nesting renderer, it simply yields wherever a foreground range
 // already claims the same text — same pattern as the woc/quotation carve-out.
-function buildBaseRanges(verseNum) {
-  const quotations = (citationByVerse[verseNum] || []).map((q) => ({ ...q, kind: "quotation" }));
-  const discourse = (discourseByVerse[verseNum] || []).map((d) => ({ ...d, kind: "discourse" }));
-  let woc = (wocByVerse[verseNum] || []).map((w) => ({ ...w, kind: "woc" }));
+function buildBaseRanges(verseId) {
+  const quotations = (citationByVerse[verseId] || []).map((q) => ({ ...q, kind: "quotation" }));
+  const discourse = (discourseByVerse[verseId] || []).map((d) => ({ ...d, kind: "discourse" }));
+  let woc = (wocByVerse[verseId] || []).map((w) => ({ ...w, kind: "woc" }));
   woc = subtractRanges(woc, quotations);
   const foreground = [...quotations, ...discourse, ...woc];
 
-  let sentiment = sentimentToggleOn ? (sentimentByVerse[verseNum] || []) : [];
+  let sentiment = sentimentToggleOn ? (sentimentByVerse[verseId] || []) : [];
   sentiment = subtractRanges(sentiment, foreground);
 
   return [...foreground, ...sentiment].sort((a, b) => a.start - b.start);
@@ -164,7 +203,7 @@ function buildBaseRanges(verseNum) {
 function buildSentimentByVerse(esvVerses) {
   if (!currentData || !currentData.sentiment || !esvVerses) return {};
   const textByVerse = {};
-  esvVerses.forEach((v) => { textByVerse[v.number] = v.text; });
+  esvVerses.forEach((v) => { textByVerse[v.id] = v.text; });
 
   const map = {};
   const words = [
@@ -173,13 +212,13 @@ function buildSentimentByVerse(esvVerses) {
   ];
   words.forEach((entry) => {
     const re = new RegExp(`\\b${escapeRegExp(entry.word)}\\b`, "gi");
-    entry.verses.forEach((num) => {
-      const text = textByVerse[num];
+    entry.verses.forEach((id) => {
+      const text = textByVerse[id];
       if (text === undefined) return;
       let m;
       re.lastIndex = 0;
       while ((m = re.exec(text))) {
-        (map[num] ||= []).push({ start: m.index, end: m.index + m[0].length, kind: entry.kind });
+        (map[id] ||= []).push({ start: m.index, end: m.index + m[0].length, kind: entry.kind });
         if (m.index === re.lastIndex) re.lastIndex++;
       }
     });
@@ -201,18 +240,18 @@ function computeSections(esvVerses, hits) {
     const existing = openerByVerse[h.verse];
     if (!existing || h.start < existing.start) openerByVerse[h.verse] = h;
   });
-  const nums = esvVerses.map((v) => v.number).sort((a, b) => a - b);
+  // esvVerses already arrives in reading order, so no sort is needed
   const result = [];
   let current = null;
-  nums.forEach((num, idx) => {
-    const opener = openerByVerse[num];
+  esvVerses.forEach((v, idx) => {
+    const opener = openerByVerse[v.id];
     if (idx === 0) {
-      current = { start: num, end: num, opener: opener || null };
+      current = { start: v.id, end: v.id, opener: opener || null };
     } else if (opener) {
       result.push(current);
-      current = { start: num, end: num, opener };
+      current = { start: v.id, end: v.id, opener };
     } else {
-      current.end = num;
+      current.end = v.id;
     }
   });
   if (current) result.push(current);
@@ -221,8 +260,7 @@ function computeSections(esvVerses, hits) {
 
 function renderEsvCellText(el) {
   const text = el.dataset.original;
-  const verseNum = Number(el.closest(".verse-cell").dataset.verse);
-  const ranges = buildBaseRanges(verseNum);
+  const ranges = buildBaseRanges(el.closest(".verse-cell").dataset.verse);
   el.innerHTML = ranges.length ? rangesToHtml(text, ranges) : escapeHtml(text);
 }
 
@@ -301,9 +339,9 @@ async function loadPassage(ref, { context } = {}) {
     location.hash = encodeURIComponent(currentRef);
     render(data);
     showState("view");
-    if (data.reference.target_verse_start) {
-      selectVerse(data.reference.target_verse_start);
-      const cell = document.querySelector(`.verse-cell[data-verse="${data.reference.target_verse_start}"]`);
+    if (data.reference.target_verse) {
+      selectVerse(data.reference.target_verse);
+      const cell = document.querySelector(`.verse-cell[data-verse="${data.reference.target_verse}"]`);
       if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   } catch (err) {
@@ -315,6 +353,11 @@ async function loadPassage(ref, { context } = {}) {
 function render(data) {
   els.title.textContent = data.reference.display;
   stopSummaryPolling();
+
+  verseIds = data.verse_ids || [];
+  versePosition = {};
+  verseIds.forEach((id, i) => { versePosition[id] = i; });
+  spansChapters = new Set(verseIds.map(verseChapter)).size > 1;
 
   discourseByVerse = {};
   (data.discourse_markers || []).forEach((m) => {
@@ -393,28 +436,34 @@ function renderGrid(data) {
 
   const visibleColumns = COLUMNS.filter((c) => activeColumns.has(c));
 
-  const allNumbers = new Set();
-  visibleColumns.forEach((c) => data.translations[c].forEach((v) => allNumbers.add(v.number)));
-  if (allNumbers.size === 0) return;
-  const minV = Math.min(...allNumbers);
-  const maxV = Math.max(...allNumbers);
+  if (verseIds.length === 0) return;
 
-  // normally one grid row per verse; with structure view on, reserve an
-  // extra row before each section (after the first) for a divider bar
+  // One grid row per verse, in the passage's own reading order, plus a
+  // full-width divider row wherever a new chapter starts and (with structure
+  // view on) wherever a section begins. Walking the ordered verse list rather
+  // than counting from the lowest to the highest verse number is what makes a
+  // multi-chapter passage possible at all — the numbers restart at each
+  // boundary — and it also copes with a verse missing from the middle.
+  const sectionAt = {}; // verse id -> the section it opens
+  if (structureToggleOn && sections.length > 1) {
+    sections.forEach((section, i) => { if (i > 0) sectionAt[section.start] = section; });
+  }
+
   const rowByVerse = {};
   const dividers = []; // {row, section}
+  const chapterBreaks = []; // {row, chapter}
   let rowCursor = 2; // row 1 is the column headers
-  if (structureToggleOn && sections.length > 1) {
-    sections.forEach((section, i) => {
-      if (i > 0) {
-        dividers.push({ row: rowCursor, section });
-        rowCursor++;
-      }
-      for (let n = section.start; n <= section.end; n++) rowByVerse[n] = rowCursor++;
-    });
-  } else {
-    for (let n = minV; n <= maxV; n++) rowByVerse[n] = rowCursor++;
-  }
+  verseIds.forEach((id, idx) => {
+    if (idx > 0 && verseChapter(id) !== verseChapter(verseIds[idx - 1])) {
+      chapterBreaks.push({ row: rowCursor, chapter: verseChapter(id) });
+      rowCursor++;
+    }
+    if (sectionAt[id]) {
+      dividers.push({ row: rowCursor, section: sectionAt[id] });
+      rowCursor++;
+    }
+    rowByVerse[id] = rowCursor++;
+  });
   grid.style.gridTemplateRows = `auto repeat(${rowCursor - 2}, auto)`;
   // set dynamically rather than in CSS — fewer active translations means
   // each gets more width instead of leaving the freed columns blank
@@ -432,6 +481,15 @@ function renderGrid(data) {
     grid.appendChild(h);
   });
 
+  chapterBreaks.forEach(({ row, chapter }) => {
+    const div = document.createElement("div");
+    div.className = "chapter-divider";
+    div.style.gridColumn = `1 / span ${visibleColumns.length}`;
+    div.style.gridRow = row;
+    div.textContent = `${data.reference.book_name} ${chapter}`;
+    grid.appendChild(div);
+  });
+
   dividers.forEach(({ row, section }) => {
     const div = document.createElement("div");
     div.className = "structure-divider";
@@ -447,9 +505,9 @@ function renderGrid(data) {
       const cell = document.createElement("div");
       cell.className = "verse-cell";
       cell.dataset.col = c;
-      cell.dataset.verse = v.number;
+      cell.dataset.verse = v.id;
       cell.style.gridColumn = colIdx + 1;
-      cell.style.gridRow = rowByVerse[v.number];
+      cell.style.gridRow = rowByVerse[v.id];
       if (colIdx === lastColIdx) cell.style.borderRight = "none";
 
       const badge = document.createElement("span");
@@ -467,7 +525,7 @@ function renderGrid(data) {
         textSpan.textContent = v.text;
       }
 
-      const notes = data.footnotes.filter((f) => f.translation === c && f.verse === v.number);
+      const notes = data.footnotes.filter((f) => f.translation === c && f.verse === v.id);
       notes.forEach((note, idx) => {
         const marker = document.createElement("sup");
         marker.className = "note-marker";
@@ -479,26 +537,26 @@ function renderGrid(data) {
         cell.appendChild(marker);
       });
 
-      cell.addEventListener("click", () => selectVerse(v.number));
+      cell.addEventListener("click", () => selectVerse(v.id));
       grid.appendChild(cell);
     });
   });
 }
 
-function selectVerse(num) {
+function selectVerse(id) {
   document.querySelectorAll(".verse-cell.selected").forEach((el) => el.classList.remove("selected"));
-  document.querySelectorAll(`.verse-cell[data-verse="${num}"]`).forEach((el) => el.classList.add("selected"));
-  renderCrossrefs(num);
+  document.querySelectorAll(`.verse-cell[data-verse="${id}"]`).forEach((el) => el.classList.add("selected"));
+  renderCrossrefs(id);
   // the sidebar scrolls internally (see .sidebar in style.css), so this
   // brings Cross References into view within the sidebar itself rather than
   // jumping the whole page and losing your place in the passage
   document.getElementById("crossref-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-function renderCrossrefs(num) {
-  const refs = currentData.cross_references[String(num)];
+function renderCrossrefs(id) {
+  const refs = currentData.cross_references[id];
   if (!refs || refs.length === 0) {
-    els.crossrefList.innerHTML = `<p class="muted">No cross-references found for verse ${num}.</p>`;
+    els.crossrefList.innerHTML = `<p class="muted">No cross-references found for verse ${escapeHtml(verseLabel(id))}.</p>`;
     return;
   }
   els.crossrefList.innerHTML = "";
@@ -547,7 +605,7 @@ function renderTerms(data) {
 
     const verses = document.createElement("div");
     verses.className = "term-verses";
-    verses.textContent = `vv. ${term.verses.join(", ")}`;
+    verses.textContent = formatVerseList(term.verses);
     row.appendChild(verses);
 
     row.addEventListener("click", () => {
@@ -634,7 +692,7 @@ function renderSentimentWordList(container, label, words, polarity) {
 
     const verses = document.createElement("div");
     verses.className = "term-verses";
-    verses.textContent = `vv. ${entry.verses.join(", ")}`;
+    verses.textContent = formatVerseList(entry.verses);
     row.appendChild(verses);
 
     row.addEventListener("click", () => {
@@ -659,13 +717,13 @@ function renderSections() {
   els.discourseList.appendChild(heading);
 
   sections.forEach((section) => {
-    const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+    const label = formatRange(section.start, section.end);
     const swatch = `<span class="minimap-swatch" style="background:${categoryColor(section.opener && section.opener.category)}"></span>`;
     const btn = document.createElement("button");
     btn.className = "discourse-item";
     btn.innerHTML = section.opener
-      ? `<span class="d-marker">${swatch}${escapeHtml(section.opener.marker.toLowerCase())} <span class="muted">(${escapeHtml(section.opener.category)})</span></span><span class="d-verse">${verseLabel}</span>`
-      : `<span class="d-marker">${swatch}Opening</span><span class="d-verse">${verseLabel}</span>`;
+      ? `<span class="d-marker">${swatch}${escapeHtml(section.opener.marker.toLowerCase())} <span class="muted">(${escapeHtml(section.opener.category)})</span></span><span class="d-verse">${label}</span>`
+      : `<span class="d-marker">${swatch}Opening</span><span class="d-verse">${label}</span>`;
     btn.addEventListener("click", () => {
       selectVerse(section.start);
       const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
@@ -726,10 +784,10 @@ function renderDiscourseMarkers(data) {
     els.discourseList.appendChild(heading);
 
     byCategory[category].forEach((group) => {
-      const verses = [...group.verses].sort((a, b) => a - b);
+      const verses = inReadingOrder(group.verses);
       const btn = document.createElement("button");
       btn.className = "discourse-item";
-      btn.innerHTML = `<span class="d-marker">${escapeHtml(group.marker)}</span><span class="d-verse">vv. ${verses.join(", ")}</span>`;
+      btn.innerHTML = `<span class="d-marker">${escapeHtml(group.marker)}</span><span class="d-verse">${formatVerseList(verses)}</span>`;
       btn.addEventListener("click", () => {
         selectVerse(verses[0]);
         const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${verses[0]}"]`);
@@ -753,7 +811,10 @@ function renderDiscourseMarkers(data) {
 // softColor, title, label}; clicking jumps to `range.start` same as the
 // Sections list and the in-grid dividers.
 function buildMinimapSegment(range) {
-  const span = range.end - range.start + 1;
+  // proportional by how many verses the range actually covers, measured as a
+  // distance in the passage's reading order — subtracting verse numbers would
+  // be meaningless across a chapter boundary
+  const span = versePosition[range.end] - versePosition[range.start] + 1;
   const segment = document.createElement("div");
   segment.className = "minimap-segment";
   segment.style.flexGrow = span; // proportional by verse count, not pixels
@@ -766,10 +827,10 @@ function buildMinimapSegment(range) {
     if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
-  const verseLabel = document.createElement("div");
-  verseLabel.className = "minimap-range";
-  verseLabel.textContent = range.start === range.end ? `v. ${range.start}` : `vv. ${range.start}-${range.end}`;
-  segment.appendChild(verseLabel);
+  const rangeEl = document.createElement("div");
+  rangeEl.className = "minimap-range";
+  rangeEl.textContent = formatRange(range.start, range.end);
+  segment.appendChild(rangeEl);
 
   const bar = document.createElement("div");
   bar.className = "minimap-bar";
@@ -803,13 +864,13 @@ function renderMinimap() {
     const track = document.createElement("div");
     track.className = "minimap-track";
     sectionHeadings.forEach((heading) => {
-      const verseLabel = heading.start === heading.end ? `v. ${heading.start}` : `vv. ${heading.start}-${heading.end}`;
+      const rangeLabel = formatRange(heading.start, heading.end);
       track.appendChild(buildMinimapSegment({
         start: heading.start,
         end: heading.end,
         color: "var(--accent)",
         softColor: "var(--accent-soft)",
-        title: `${verseLabel} — ${heading.title}`,
+        title: `${rangeLabel} — ${heading.title}`,
         label: heading.title,
       }));
     });
@@ -830,15 +891,15 @@ function renderMinimap() {
     sections.forEach((section) => {
       const category = section.opener && section.opener.category;
       const color = categoryColor(category);
-      const verseLabel = section.start === section.end ? `v. ${section.start}` : `vv. ${section.start}-${section.end}`;
+      const rangeLabel = formatRange(section.start, section.end);
       track.appendChild(buildMinimapSegment({
         start: section.start,
         end: section.end,
         color,
         softColor: categorySoftColor(category),
         title: section.opener
-          ? `${verseLabel} — ${section.opener.marker} (${section.opener.category})`
-          : `${verseLabel} — opening`,
+          ? `${rangeLabel} — ${section.opener.marker} (${section.opener.category})`
+          : `${rangeLabel} — opening`,
         label: section.opener ? section.opener.marker : "Opening",
       }));
       if (section.opener && !categoriesSeen.has(section.opener.category)) {
@@ -868,12 +929,12 @@ function clearTermHighlight() {
 // Highlights every match of `regex` in the given ESV verses (on top of any
 // discourse-marker highlighting already there) and scrolls to the first one.
 // Shared by Top Terms and Key Terms (glossary) clicks.
-function applyHighlightRegex(regex, verseNumbers) {
-  verseNumbers.forEach((num) => {
-    const el = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${num}"] .verse-text`);
+function applyHighlightRegex(regex, verseIdList) {
+  verseIdList.forEach((id) => {
+    const el = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${id}"] .verse-text`);
     if (!el) return;
     const text = el.dataset.original;
-    const baseRanges = buildBaseRanges(num);
+    const baseRanges = buildBaseRanges(id);
     let m;
     regex.lastIndex = 0;
     const termRanges = [];
@@ -889,20 +950,20 @@ function applyHighlightRegex(regex, verseNumbers) {
     const ranges = [...other, ...sentiment, ...termRanges].sort((a, b) => a.start - b.start);
     el.innerHTML = rangesToHtml(text, ranges);
   });
-  const firstCell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${verseNumbers[0]}"]`);
+  const firstCell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${verseIdList[0]}"]`);
   if (firstCell) firstCell.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // Toggles `rowEl` as the single active highlight row across both the Top
 // Terms and Key Terms panels, so only one set of yellow marks is ever shown
 // at once (on top of the always-on discourse-marker highlighting).
-function setActiveHighlight(rowEl, regex, verseNumbers) {
+function setActiveHighlight(rowEl, regex, verseIdList) {
   const wasActive = rowEl.classList.contains("active");
   document.querySelectorAll(".term-row.active, .glossary-entry.active").forEach((r) => r.classList.remove("active"));
   clearTermHighlight();
   if (!wasActive) {
     rowEl.classList.add("active");
-    applyHighlightRegex(regex, verseNumbers);
+    applyHighlightRegex(regex, verseIdList);
   }
 }
 
@@ -1029,9 +1090,9 @@ function summaryBlock(title) {
   return block;
 }
 
-function jumpToVerse(num) {
-  selectVerse(num);
-  const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${num}"]`);
+function jumpToVerse(id) {
+  selectVerse(id);
+  const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${id}"]`);
   if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
@@ -1056,13 +1117,14 @@ function renderSummaryContent(summary) {
   if ((summary.sections || []).length) {
     const block = summaryBlock("Sections");
     summary.sections.forEach((s) => {
-      const label = s.start === s.end ? `v. ${s.start}` : `vv. ${s.start}-${s.end}`;
+      const start = toVerseId(s.start);
+      const end = toVerseId(s.end);
       const btn = document.createElement("button");
       btn.className = "summary-section";
       btn.innerHTML =
-        `<span class="s-head"><span class="s-title">${escapeHtml(s.title)}</span><span class="d-verse">${label}</span></span>` +
+        `<span class="s-head"><span class="s-title">${escapeHtml(s.title)}</span><span class="d-verse">${formatRange(start, end)}</span></span>` +
         `<span class="s-line">${escapeHtml(s.line || "")}</span>`;
-      btn.addEventListener("click", () => jumpToVerse(s.start));
+      btn.addEventListener("click", () => jumpToVerse(start));
       block.appendChild(btn);
     });
     els.summaryContent.appendChild(block);
@@ -1071,7 +1133,7 @@ function renderSummaryContent(summary) {
   if ((summary.themes || []).length) {
     const block = summaryBlock("Recurring themes");
     summary.themes.forEach((t) => {
-      const verses = (t.verses || []).length ? `vv. ${t.verses.join(", ")}` : "";
+      const verses = (t.verses || []).length ? formatVerseList(t.verses.map(toVerseId)) : "";
       const entry = document.createElement("div");
       entry.className = "summary-theme";
       entry.innerHTML =
@@ -1084,7 +1146,7 @@ function renderSummaryContent(summary) {
         entry.classList.add("clickable");
         entry.addEventListener("click", () => {
           const pattern = triggers.map(escapeRegExp).join("|");
-          setActiveHighlight(entry, new RegExp(`\\b(${pattern})\\b`, "gi"), t.verses || []);
+          setActiveHighlight(entry, new RegExp(`\\b(${pattern})\\b`, "gi"), (t.verses || []).map(toVerseId));
         });
       }
       block.appendChild(entry);
@@ -1100,7 +1162,7 @@ function renderSummaryContent(summary) {
       const badge = r.kind === "quotation"
         ? '<span class="cr-quote-badge">Quotation</span>'
         : '<span class="cr-quote-badge cr-badge-parallel">Parallel</span>';
-      const verses = (r.verses || []).length ? `at vv. ${r.verses.join(", ")}` : "";
+      const verses = (r.verses || []).length ? `at ${formatVerseList(r.verses.map(toVerseId))}` : "";
       const entry = document.createElement("div");
       entry.className = "summary-reference";
       entry.innerHTML =
@@ -1108,7 +1170,7 @@ function renderSummaryContent(summary) {
         `<div class="s-line">${escapeHtml(r.why || "")}</div>`;
       if ((r.verses || []).length) {
         entry.classList.add("clickable");
-        entry.addEventListener("click", () => jumpToVerse(r.verses[0]));
+        entry.addEventListener("click", () => jumpToVerse(toVerseId(r.verses[0])));
       }
       block.appendChild(entry);
     });
@@ -1131,7 +1193,7 @@ function renderGlossary(data) {
   data.glossary.forEach((g) => {
     const entry = document.createElement("div");
     entry.className = "glossary-entry";
-    entry.innerHTML = `<div class="g-term">${escapeHtml(g.term)} <span class="g-lang">(${escapeHtml(g.language)}: ${escapeHtml(g.transliteration)})</span></div><div class="g-gloss">${escapeHtml(g.gloss)}</div><div class="g-verses">vv. ${g.verses.join(", ")}</div>`;
+    entry.innerHTML = `<div class="g-term">${escapeHtml(g.term)} <span class="g-lang">(${escapeHtml(g.language)}: ${escapeHtml(g.transliteration)})</span></div><div class="g-gloss">${escapeHtml(g.gloss)}</div><div class="g-verses">${formatVerseList(g.verses)}</div>`;
 
     entry.addEventListener("click", () => {
       const pattern = g.triggers.map(escapeRegExp).join("|");
