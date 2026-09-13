@@ -115,11 +115,25 @@ Once it is running, open the URL it prints (normally
 search, so the app never has to fetch or hold the whole Bible at once. Type
 something like `Eph 1:1-14`, `John 3:16`, or `Psalm 23` and search.
 
-A note on scope: right now you can search a single chapter, or a verse range
-within a single chapter. Multi-chapter references like `Jonah 3-4` are not
-supported yet, since verse numbers reset at each chapter boundary and the
-reading grid, cross references, and tone analysis all currently assume verse
-numbers are unique within one request.
+### What you can search
+
+| Type this | You get |
+|---|---|
+| `Ephesians 1` | a whole chapter |
+| `Eph 1:3-14` | a verse range |
+| `John 3:16` | a single verse |
+| `Jonah 3-4` | whole chapters 3 to 4 |
+| `Eph 1:15-2:10` | verse 15 of chapter 1 through verse 10 of chapter 2 |
+| `Jude 3-5` | verses, since Jude only has one chapter |
+
+A dash with no colon anywhere means chapters, so `Romans 9-11` is the whole
+argument rather than three verses. The exception is the five single-chapter
+books (Obadiah, Philemon, 2 John, 3 John, Jude), where a bare range can only
+mean verses.
+
+A passage can span at most five chapters. Past that, a first-time request means
+four API round trips per chapter, and a single chapter can be large on its own
+(Psalm 119 is 176 verses).
 
 ## How the pieces fit together
 
@@ -147,7 +161,18 @@ numbers are unique within one request.
   "essentially literal" translation, tends to preserve markers like "Behold"
   and sentence initial "For" that more idiomatic translations smooth over.
 - **The glossary** (`data/glossary.json`) is a hand curated list, not pulled
-  from an API.
+  from an API. It matches English trigger words, so it is filtered by
+  testament: Hebrew entries only appear for Old Testament books and Greek
+  only for New. Without that it would cheerfully report that Shalom, Ruach
+  and Elohim are all present in Ephesians, which is a Greek epistle — the
+  trigger word "god" says nothing about the language a book was written in.
+- **Multi-chapter passages** work because a verse is identified by
+  `chapter:verse` rather than a bare number, which restarts at every chapter
+  boundary. The reading grid, the minimap and the section spans all do their
+  arithmetic over the passage's own verse order rather than over verse
+  numbers. One thing this buys beyond the obvious: a publisher section
+  heading that straddles a boundary (Romans 9:30-10:21, say) can finally be
+  shown whole instead of clipped at the chapter line.
 - **The summary** is the one panel that is not computed locally, because it
   cannot be. Everything else here is traceable: a tone score points back at
   the words that drove it, a section break points at the discourse marker

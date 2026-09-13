@@ -1,0 +1,115 @@
+{
+  "reference": "Ephesians 1:1-22",
+  "generated_at": 1789289906.081123,
+  "sections": [
+    {
+      "title": "Greeting",
+      "start": "1:1",
+      "end": "1:2",
+      "line": "Paul writes as an apostle by God's will, not his own."
+    },
+    {
+      "title": "Chosen before the foundation",
+      "start": "1:3",
+      "end": "1:6",
+      "line": "Election stated as praise rather than posed as a problem."
+    },
+    {
+      "title": "Redemption and the disclosed plan",
+      "start": "1:7",
+      "end": "1:10",
+      "line": "Blood-bought forgiveness reveals a plan to unite everything in Christ."
+    },
+    {
+      "title": "Sealed and guaranteed",
+      "start": "1:11",
+      "end": "1:14",
+      "line": "The Spirit is the deposit on an inheritance not yet paid."
+    },
+    {
+      "title": "A prayer for sight",
+      "start": "1:15",
+      "end": "1:22",
+      "line": "Not for more gifts, but for eyes to see these."
+    }
+  ],
+  "themes": [
+    {
+      "theme": "In Christ",
+      "note": "Every blessing is located in him, never merely alongside him.",
+      "verses": [
+        "1:1",
+        "1:3",
+        "1:4",
+        "1:7",
+        "1:9",
+        "1:10",
+        "1:11",
+        "1:13"
+      ],
+      "triggers": [
+        "in christ",
+        "in him",
+        "in the beloved"
+      ]
+    },
+    {
+      "theme": "According to his will",
+      "note": "Each gift traced to God's purpose, never to our merit.",
+      "verses": [
+        "1:5",
+        "1:7",
+        "1:9",
+        "1:11",
+        "1:19"
+      ],
+      "triggers": [
+        "according to"
+      ]
+    },
+    {
+      "theme": "To the praise of his glory",
+      "note": "The refrain closing each movement, naming the point.",
+      "verses": [
+        "1:6",
+        "1:12",
+        "1:14"
+      ],
+      "triggers": [
+        "praise of his glory",
+        "praise of his glorious"
+      ]
+    },
+    {
+      "theme": "Power that raised and seated",
+      "note": "Resurrection power is the measure of what works in believers.",
+      "verses": [
+        "1:19",
+        "1:20",
+        "1:21",
+        "1:22"
+      ],
+      "triggers": [
+        "power",
+        "strength",
+        "raised",
+        "seated"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "ref": "Psalm 8:6",
+      "verses": [
+        "1:22"
+      ],
+      "kind": "quotation",
+      "why": "Humanity's mandate over creation is claimed for Christ, so the church's head already rules everything under his feet."
+    }
+  ],
+  "purpose": [
+    "Paul wants us to know our standing was settled before the world began, so that nothing happening later can unsettle it.",
+    "He wants us to believe God has one plan \u2014 to gather everything into Christ \u2014 so that our own salvation reads as part of it.",
+    "He prays for enlightened eyes rather than new gifts, because what the Ephesians lack is not provision but sight of what they hold."
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "reference": "Jonah 3-4",
+  "generated_at": 1789289906.080746,
+  "sections": [
+    {
+      "title": "The commission, a second time",
+      "start": "3:1",
+      "end": "3:4",
+      "line": "A reluctant prophet and the shortest sermon in scripture."
+    },
+    {
+      "title": "Nineveh believes, top to bottom",
+      "start": "3:5",
+      "end": "3:9",
+      "line": "King, people and livestock in sackcloth, hoping God might relent."
+    },
+    {
+      "title": "God relents, Jonah rages",
+      "start": "3:10",
+      "end": "4:3",
+      "line": "The mercy Jonah dreaded arrives, and he asks to die."
+    },
+    {
+      "title": "Argued out of his own pity",
+      "start": "4:4",
+      "end": "4:11",
+      "line": "God turns Jonah's grief for a plant into a question."
+    }
+  ],
+  "themes": [
+    {
+      "theme": "Relenting",
+      "note": "Three times the word turns: God may, God did, God does.",
+      "verses": [
+        "3:9",
+        "3:10",
+        "4:2"
+      ],
+      "triggers": [
+        "relent",
+        "relented",
+        "relents"
+      ]
+    },
+    {
+      "theme": "Anger, God's and Jonah's",
+      "note": "God's fierce anger cools; Jonah's never does.",
+      "verses": [
+        "3:9",
+        "4:1",
+        "4:2",
+        "4:4",
+        "4:9"
+      ],
+      "triggers": [
+        "angry",
+        "anger"
+      ]
+    },
+    {
+      "theme": "God appoints",
+      "note": "A vine, a worm, a wind \u2014 three appointments, one lesson.",
+      "verses": [
+        "4:6",
+        "4:7",
+        "4:8"
+      ],
+      "triggers": [
+        "appointed"
+      ]
+    },
+    {
+      "theme": "The great city",
+      "note": "Called great at the start and at the end, never by Jonah.",
+      "verses": [
+        "3:2",
+        "3:3",
+        "4:11"
+      ],
+      "triggers": [
+        "great city"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "ref": "Joel 2:13",
+      "verses": [
+        "4:2"
+      ],
+      "kind": "parallel",
+      "why": "Jonah recites Israel's own creed about mercy \u2014 and recites it as a complaint, which is the joke of the book."
+    },
+    {
+      "ref": "Jeremiah 18:8",
+      "verses": [
+        "3:10"
+      ],
+      "kind": "parallel",
+      "why": "The potter passage states the rule this narrative enacts: a threatened disaster is revocable if the nation turns."
+    },
+    {
+      "ref": "2 Samuel 12:22",
+      "verses": [
+        "3:9"
+      ],
+      "kind": "parallel",
+      "why": "Supplies the 'who knows?' of hopeful repentance \u2014 David's words over a dying child, now in pagan mouths."
+    },
+    {
+      "ref": "1 Kings 19:4",
+      "verses": [
+        "4:3"
+      ],
+      "kind": "parallel",
+      "why": "Elijah under the broom tree asking to die, so Jonah's sulk reads as a prophet's posture God has indulged before."
+    },
+    {
+      "ref": "Matthew 12:41",
+      "verses": [
+        "3:5"
+      ],
+      "kind": "parallel",
+      "why": "Jesus turns Nineveh's repentance into an accusation against his own generation: the pagans managed it."
+    }
+  ],
+  "purpose": [
+    "The author wants us to know God relents when a people turn, because the threat in a prophet's mouth was always an invitation rather than a verdict.",
+    "He wants us to watch Jonah grieve a dead plant more than a living city, so that we notice how small our own pity has become.",
+    "He wants us to believe that mercy reaches past Israel to 120,000 strangers and their cattle, because the book ends on that question and never answers it."
+  ]
+}

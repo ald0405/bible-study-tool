@@ -33,9 +33,9 @@ REQUEST_DIRNAME = "summary_requests"
 # panel is meant to be scannable in a few seconds, so the shape does the work
 # of keeping it punchy rather than relying on the instruction alone.
 SCHEMA_HINT = {
-    "sections": "3-5 items, the argument's real movements: {title, start, end, line}",
-    "themes": "3-4 items: {theme, note, verses[], triggers[]}",
-    "references": "up to 5 items: {ref, verses[], kind: quotation|parallel, why}",
+    "sections": "3-5 items, the argument's real movements: {title, start, end, line} where start/end are verse ids",
+    "themes": "3-4 items: {theme, note, verses[] (verse ids), triggers[]}",
+    "references": "up to 5 items: {ref, verses[] (verse ids), kind: quotation|parallel, why}",
     "purpose": "2-3 strings, each 'X wants us to know/believe ... so that/because ...'",
 }
 
@@ -49,10 +49,19 @@ def request_dir(data_dir):
 
 
 def summary_key(ref):
-    """"EPH_1" for a whole chapter, "EPH_1_3-14" for a range. Keyed on the full
-    range rather than the chapter, since a summary of Eph 1:3-14 is a genuinely
-    different piece of work from a summary of the whole chapter."""
-    key = f"{ref['book_id']}_{ref['chapter']}"
+    """"EPH_1" for a whole chapter, "EPH_1_3-14" for a range within one,
+    "JON_3-4" for a chapter range, "EPH_1:15-2:10" across a boundary. Keyed on
+    the full range rather than the chapter, since a summary of Eph 1:3-14 is a
+    genuinely different piece of work from one of the whole chapter.
+
+    The single-chapter forms are unchanged from before multi-chapter support,
+    so summaries written back then still resolve."""
+    book, first, last = ref["book_id"], ref["chapter"], ref["chapter_end"]
+    if first != last:
+        if ref.get("verse_start"):
+            return f"{book}_{first}:{ref['verse_start']}-{last}:{ref['verse_end']}"
+        return f"{book}_{first}-{last}"
+    key = f"{book}_{first}"
     if ref.get("verse_start"):
         key += f"_{ref['verse_start']}-{ref['verse_end']}"
     return key
@@ -96,10 +105,11 @@ def build_bundle(ref, payload):
     not the text itself.
     """
     cross_references = []
-    for verse, entries in sorted(payload["cross_references"].items(), key=lambda kv: int(kv[0])):
+    order = {vid: i for i, vid in enumerate(payload["verse_ids"])}
+    for verse, entries in sorted(payload["cross_references"].items(), key=lambda kv: order.get(kv[0], 0)):
         for entry in entries:
             cross_references.append({
-                "verse": int(verse),
+                "verse": verse,
                 "refs": entry["refs"],
                 "title": entry["title"],
                 "kind": "quotation" if entry["is_quotation"] else "parallel",
@@ -118,6 +128,7 @@ def build_bundle(ref, payload):
     return {
         "reference": payload["reference"]["display"],
         "book": payload["reference"]["book_name"],
+        "spans_chapters": payload["reference"]["chapter_end"] != payload["reference"]["chapter"],
         "instructions": (
             "Write a short, punchy study summary of this passage. Ground every claim in the "
             "verses and metadata below; do not introduce cross-references that are not listed. "
@@ -125,6 +136,7 @@ def build_bundle(ref, payload):
         ),
         "schema": SCHEMA_HINT,
         "verses": payload["translations"]["BSB"],
+        "verse_ids": payload["verse_ids"],
         "verses_translation": "BSB",
         "publisher_section_headings": payload["section_headings"],
         "repeated_terms": payload["terms"],

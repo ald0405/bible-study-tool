@@ -62,8 +62,12 @@ def _lemma(word):
 
 
 def analyze(verses, top_n=10):
-    """verses: list of {'number': int, 'text': str}. Returns top_n terms/phrases
-    with counts and the verse numbers each occurs in."""
+    """verses: list of {'id': str, 'text': str}, in reading order. Returns
+    top_n terms/phrases with counts and the verse ids each occurs in."""
+    # verse ids are sorted by position, never lexically — verse numbers restart
+    # at each chapter boundary, so "10:1" would sort before "9:33"
+    position = {v["id"]: i for i, v in enumerate(verses)}
+    in_order = lambda ids: sorted(ids, key=position.get)  # noqa: E731
     term_verses = defaultdict(set)
     term_surface = defaultdict(Counter)
     phrase_counts = Counter()
@@ -78,7 +82,7 @@ def analyze(verses, top_n=10):
                 continue
             lemma = _lemma(t)
             term_surface[lemma][t] += 1
-            term_verses[lemma].add(v["number"])
+            term_verses[lemma].add(v["id"])
 
         for n in (2, 3):
             for i in range(len(alpha) - n + 1):
@@ -90,7 +94,7 @@ def analyze(verses, top_n=10):
                     continue
                 phrase = " ".join(gram)
                 phrase_counts[phrase] += 1
-                phrase_verses[phrase].add(v["number"])
+                phrase_verses[phrase].add(v["id"])
 
     items = []
     for lemma, verse_set in term_verses.items():
@@ -98,12 +102,12 @@ def analyze(verses, top_n=10):
         if count < 2:
             continue
         surface = term_surface[lemma].most_common(1)[0][0]
-        items.append({"term": surface, "count": count, "verses": sorted(verse_set), "type": "word"})
+        items.append({"term": surface, "count": count, "verses": in_order(verse_set), "type": "word"})
 
     for phrase, count in phrase_counts.items():
         if count < 2:
             continue
-        items.append({"term": phrase, "count": count, "verses": sorted(phrase_verses[phrase]), "type": "phrase"})
+        items.append({"term": phrase, "count": count, "verses": in_order(phrase_verses[phrase]), "type": "phrase"})
 
     items.sort(key=lambda x: (-x["count"], -len(x["term"].split()), x["term"]))
 

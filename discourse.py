@@ -36,9 +36,11 @@ def _is_sentence_initial(text, start, prev_tail=None):
 
 
 def find_markers(verses):
-    """verses: list of {'number': int, 'text': str} (ESV). Returns hits sorted
-    by verse then position, each with character offsets into that verse's text
-    so the frontend can highlight the exact span without re-matching."""
+    """verses: list of {'id': str, 'text': str} (ESV), in reading order.
+    Returns hits sorted by verse then position, each with character offsets
+    into that verse's text so the frontend can highlight the exact span
+    without re-matching."""
+    position = {v["id"]: i for i, v in enumerate(verses)}
     hits = []
     prev_tail = None
     for v in verses:
@@ -57,7 +59,7 @@ def find_markers(verses):
                 hits.append({
                     "marker": text[start:end],
                     "category": marker_def["category"],
-                    "verse": v["number"],
+                    "verse": v["id"],
                     "start": start,
                     "end": end,
                     # true when this occurrence opens a sentence, regardless of
@@ -68,5 +70,7 @@ def find_markers(verses):
         trimmed = text.rstrip().rstrip(_QUOTE_CHARS).rstrip()
         if trimmed:
             prev_tail = trimmed[-1]
-    hits.sort(key=lambda h: (h["verse"], h["start"]))
+    # by position in the passage, not by the id string — verse numbers restart
+    # at each chapter boundary, so "10:1" would sort before "9:33"
+    hits.sort(key=lambda h: (position[h["verse"]], h["start"]))
     return hits

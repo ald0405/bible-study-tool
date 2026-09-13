@@ -48,10 +48,15 @@ def _tokenize(text):
 
 
 def analyze(verses):
-    """verses: list of {'number': int, 'text': str} (ESV). Returns None if the
-    VADER lexicon isn't available (e.g. `make setup` wasn't run)."""
+    """verses: list of {'id': str, 'text': str} (ESV), in reading order.
+    Returns None if the VADER lexicon isn't available (e.g. `make setup`
+    wasn't run)."""
     if _sia is None or not verses:
         return None
+
+    # verse ids are sorted by position, never lexically — verse numbers restart
+    # at each chapter boundary, so "10:1" would sort before "9:33"
+    position = {v["id"]: i for i, v in enumerate(verses)}
 
     full_text = " ".join(v["text"] for v in verses)
     compound = _sia.polarity_scores(full_text)["compound"]
@@ -63,12 +68,12 @@ def analyze(verses):
                 continue
             score = _sia.lexicon.get(token)
             if score is not None and abs(score) >= SCORE_THRESHOLD:
-                word_verses[token].add(v["number"])
+                word_verses[token].add(v["id"])
 
     positive, negative = [], []
     for word, verse_set in word_verses.items():
         score = _sia.lexicon[word]
-        entry = {"word": word, "score": score, "verses": sorted(verse_set)}
+        entry = {"word": word, "score": score, "verses": sorted(verse_set, key=position.get)}
         (positive if score > 0 else negative).append(entry)
 
     positive.sort(key=lambda e: -e["score"])

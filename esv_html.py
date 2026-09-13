@@ -6,6 +6,14 @@ include-crossrefs=true) attaches a <sup><a class="cf" href="..." title="...">
 marker to the exact phrase it annotates. When that phrase is an actual
 quotation of another passage, the title is prefixed "Cited from ..." — that's
 the signal used to distinguish quotations from plain thematic references.
+
+A passage can span several chapters, so a verse is identified here by a
+(chapter, verse) pair rather than a bare number — verse numbers restart at
+each chapter boundary. The ESV HTML marks a new chapter with
+<b class="chapter-num">2:1</b>; plain verses inside it get
+<b class="verse-num">5</b> and inherit the current chapter. A passage that
+starts mid-chapter (e.g. "Ephesians 1:20-2:3") opens on a verse-num with no
+chapter-num before it, so parse() must be told which chapter it starts in.
 """
 
 import re
@@ -27,11 +35,12 @@ def _attr(attrs, name):
 
 
 class _EsvHtmlParser(HTMLParser):
-    def __init__(self):
+    def __init__(self, start_chapter):
         super().__init__(convert_charrefs=True)
-        self.current_verse = None
+        self.current_chapter = start_chapter
+        self.current_verse = None  # (chapter, verse) key, or None before the first verse
         self.verse_order = []
-        self.texts = {}  # verse -> accumulated, already-normalized text
+        self.texts = {}  # (chapter, verse) -> accumulated, already-normalized text
 
         self.in_verse_num = False
         self.verse_num_buffer = ""
@@ -68,11 +77,12 @@ class _EsvHtmlParser(HTMLParser):
             s = s.lstrip(" ")
         self.texts[verse] = current + s
 
-    def _set_verse(self, number):
-        self.current_verse = number
-        if number not in self.texts:
-            self.verse_order.append(number)
-            self.texts[number] = ""
+    def _set_verse(self, chapter, verse):
+        key = (chapter, verse)
+        self.current_verse = key
+        if key not in self.texts:
+            self.verse_order.append(key)
+            self.texts[key] = ""
 
     def handle_starttag(self, tag, attrs):
         classes = _classes(attrs)
@@ -134,13 +144,21 @@ class _EsvHtmlParser(HTMLParser):
 
     def handle_endtag(self, tag):
         if tag == "b" and self.in_verse_num:
-            # the opening verse of a chapter is marked class="chapter-num"
-            # with text "1:1" (chapter:verse) instead of plain "1" — take
-            # whatever follows the last colon before stripping non-digits
-            verse_text = self.verse_num_buffer.rsplit(":", 1)[-1]
+            # the opening verse of a chapter is marked class="chapter-num" with
+            # text "2:1" (chapter:verse) instead of plain "1" — so a colon here
+            # is how a chapter boundary announces itself mid-passage. Verses
+            # without one inherit whatever chapter is current.
+            buffer = self.verse_num_buffer
+            if ":" in buffer:
+                chapter_text, verse_text = buffer.rsplit(":", 1)
+                chapter_digits = re.sub(r"\D", "", chapter_text)
+                if chapter_digits:
+                    self.current_chapter = int(chapter_digits)
+            else:
+                verse_text = buffer
             digits = re.sub(r"\D", "", verse_text)
-            if digits:
-                self._set_verse(int(digits))
+            if digits and self.current_chapter is not None:
+                self._set_verse(self.current_chapter, int(digits))
             self.in_verse_num = False
             return
 
@@ -191,8 +209,24 @@ class _EsvHtmlParser(HTMLParser):
         self._append(self.current_verse, data)
 
 
-def parse(html):
-    parser = _EsvHtmlParser()
+def _split(key):
+    """Internal (chapter, verse) tuple -> the public pair of ints."""
+    return {"chapter": key[0], "verse": key[1]}
+
+
+def _public_citation(citation):
+    out = {**citation, **_split(citation["verse"])}
+    for boundary in ("block_end", "woc_end"):
+        edge = citation[boundary]
+        out[boundary] = {**_split(edge["verse"]), "offset": edge["offset"]} if edge else None
+    return out
+
+
+def parse(html, start_chapter):
+    """start_chapter is the chapter the passage opens in. Required because a
+    passage beginning mid-chapter gets a plain verse-num for its first verse,
+    with no chapter-num to announce the chapter (see the module docstring)."""
+    parser = _EsvHtmlParser(start_chapter)
     parser.feed(html)
     parser.close()
 
@@ -201,19 +235,25 @@ def parse(html):
             citation["block_end"] = parser.deferred_block_end
 
     verses = []
-    for number in parser.verse_order:
-        text = parser.texts.get(number, "")
+    for key in parser.verse_order:
+        text = parser.texts.get(key, "")
         text = re.sub(r"\(\s*\)\s*$", "", text).rstrip()
-        verses.append({"number": number, "text": text})
+        verses.append({"chapter": key[0], "number": key[1], "text": text})
 
-    citations = sorted(parser.citations, key=lambda c: (c["verse"], c["offset"]))
-    woc_spans = sorted(parser.woc_spans, key=lambda w: (w["verse"], w["start"]))
+    citations = [
+        _public_citation(c)
+        for c in sorted(parser.citations, key=lambda c: (c["verse"], c["offset"]))
+    ]
+    woc_spans = [
+        {**_split(w["verse"]), "start": w["start"], "end": w["end"]}
+        for w in sorted(parser.woc_spans, key=lambda w: (w["verse"], w["start"]))
+    ]
     return {"verses": verses, "citations": citations, "woc_spans": woc_spans}
 
 
 def quotation_spans(verses, citations):
-    """Expand is_quotation citations into per-verse {verse, start, end, refs,
-    title} ranges for inline highlighting. The end boundary comes from,
+    """Expand is_quotation citations into per-verse {chapter, verse, start, end,
+    refs, title} ranges for inline highlighting. The end boundary comes from,
     in priority order:
       1. block_end — the end of the containing <p class="block-indent">
          paragraph, i.e. how Crossway typesets a poetry-formatted OT
@@ -226,32 +266,46 @@ def quotation_spans(verses, citations):
     Deliberately does NOT fall back to "the next quotation's start" — that
     over-extends short inline quotes across any plain narrative text (and
     verses) sitting between them and whatever the next quotation happens to
-    be, however far away."""
-    verse_order = [v["number"] for v in verses]
-    verse_index = {n: i for i, n in enumerate(verse_order)}
-    verse_len = {v["number"]: len(v["text"]) for v in verses}
+    be, however far away.
+
+    Positions are resolved by index into the passage's own verse order, so a
+    quotation that runs across a chapter boundary spans it correctly without
+    any verse-number arithmetic."""
+    verse_order = [(v["chapter"], v["number"]) for v in verses]
+    verse_index = {key: i for i, key in enumerate(verse_order)}
+    verse_len = {key: len(v["text"]) for key, v in zip(verse_order, verses)}
 
     quotations = [c for c in citations if c["is_quotation"]]
     spans = []
     for q in quotations:
-        start_verse, start_offset = q["verse"], q["offset"]
+        start_key, start_offset = (q["chapter"], q["verse"]), q["offset"]
         if q["block_end"]:
-            end_verse, end_offset = q["block_end"]["verse"], q["block_end"]["offset"]
+            end_key = (q["block_end"]["chapter"], q["block_end"]["verse"])
+            end_offset = q["block_end"]["offset"]
         elif q["woc_end"]:
-            end_verse, end_offset = q["woc_end"]["verse"], q["woc_end"]["offset"]
+            end_key = (q["woc_end"]["chapter"], q["woc_end"]["verse"])
+            end_offset = q["woc_end"]["offset"]
         else:
-            end_verse = start_verse
-            end_offset = verse_len.get(start_verse, start_offset)
+            end_key = start_key
+            end_offset = verse_len.get(start_key, start_offset)
 
-        if start_verse not in verse_index or end_verse not in verse_index:
+        if start_key not in verse_index or end_key not in verse_index:
             continue
-        start_idx, end_idx = verse_index[start_verse], verse_index[end_verse]
+        start_idx, end_idx = verse_index[start_key], verse_index[end_key]
         if end_idx < start_idx:
             continue
         for idx in range(start_idx, end_idx + 1):
-            v = verse_order[idx]
-            v_start = start_offset if v == start_verse else 0
-            v_end = end_offset if v == end_verse else verse_len.get(v, 0)
+            key = verse_order[idx]
+            length = verse_len.get(key, 0)
+            v_start = start_offset if key == start_key else 0
+            # clamp: offsets are recorded while parsing, but parse() then strips
+            # each verse's trailing whitespace, so a block_end captured at the
+            # close of a <p> can land one character past the final length
+            v_end = min(end_offset if key == end_key else length, length)
             if v_end > v_start:
-                spans.append({"verse": v, "start": v_start, "end": v_end, "refs": q["refs"], "title": q["title"]})
+                spans.append({
+                    "chapter": key[0], "verse": key[1],
+                    "start": v_start, "end": v_end,
+                    "refs": q["refs"], "title": q["title"],
+                })
     return spans
