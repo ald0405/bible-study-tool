@@ -2,6 +2,7 @@
   --bg: #f7f7f5;
   --surface: #ffffff;
   --border: #dcdcd8;
+  --border-faint: #efefec;
   --text: #1c1d1f;
   --text-muted: #6b6d70;
   --accent: #2b3a55;
@@ -191,14 +192,42 @@ main#app {
   border-bottom: 1px solid var(--border);
 }
 
+/* Verses inside one paragraph are separated only by a hairline, so the
+   paragraph reads as a single block of thought rather than a stack of boxed
+   rows; the full rule lands on the last verse of each paragraph. The hairline
+   stays because five columns still need a shared row to scan across. */
 .verse-cell {
   font-family: var(--serif);
   font-size: 1.03rem;
-  padding: 0.85rem 1.1rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.7rem 1.1rem;
+  border-bottom: 1px solid var(--border-faint);
   border-right: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s;
+}
+
+.verse-cell.paragraph-end { border-bottom: 1px solid var(--border); }
+
+/* Poetry gets a hanging indent, so a line that wraps is visibly a continuation
+   rather than a new line of verse. */
+.verse-cell.poetry .verse-text {
+  display: inline-block;
+  padding-left: 1.1em;
+  text-indent: -1.1em;
+}
+
+/* The indented second limb of a couplet. Inline-block so it is valid inside
+   any highlight span a quotation or tone wash may have opened. */
+.pline-indent {
+  display: inline-block;
+  width: 1.4em;
+}
+
+/* A blank row where the author starts a new thought. */
+.paragraph-gap {
+  height: 0.9rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 

@@ -81,6 +81,13 @@ let verseIds = [];
 let versePosition = {};
 let spansChapters = false;
 
+// The passage's own shape, from the ESV's markup: which paragraph each verse
+// belongs to (Crossway's paragraphing — the author's thought units, and a
+// better answer to "where are the sections" than any marker heuristic), and
+// where poetry lines break inside each verse.
+let paragraphByVerse = {};
+let esvBreaks = {};
+
 function verseChapter(id) {
   return id.split(":")[0];
 }
@@ -129,15 +136,37 @@ function setPanelCount(elementId, count) {
   if (el) el.textContent = count > 0 ? `(${count})` : "";
 }
 
+// Emits text[from, to) as escaped HTML with any poetry line breaks falling
+// inside it. A break sits on the space separating two lines, so that space is
+// consumed by the break itself. Emitting breaks during the range walk (rather
+// than splitting the text first) is what lets a quotation or tone span run
+// across a line break without the two fighting over the same characters.
+function sliceWithBreaks(text, from, to, breaks) {
+  if (!breaks || breaks.length === 0) return escapeHtml(text.slice(from, to));
+  let out = "";
+  let pos = from;
+  breaks.forEach((b) => {
+    if (b.offset < pos || b.offset >= to) return;
+    out += escapeHtml(text.slice(pos, b.offset));
+    out += "<br>";
+    // the indented second limb of a couplet — in Hebrew poetry the indent is
+    // the parallelism, not decoration
+    if (b.indent > 0) out += `<span class="pline-indent"></span>`;
+    pos = b.offset + 1;
+  });
+  return out + escapeHtml(text.slice(pos, to));
+}
+
 // Renders `text` as HTML, wrapping the given non-overlapping [start,end)
-// ranges (sorted by start) each in the markup for its `kind`.
-function rangesToHtml(text, ranges) {
+// ranges (sorted by start) each in the markup for its `kind`, and breaking
+// poetry lines at `breaks`.
+function rangesToHtml(text, ranges, breaks) {
   let html = "";
   let pos = 0;
   ranges.forEach((r) => {
     if (r.start < pos) return; // defensively skip any residual overlap
-    html += escapeHtml(text.slice(pos, r.start));
-    const inner = escapeHtml(text.slice(r.start, r.end));
+    html += sliceWithBreaks(text, pos, r.start, breaks);
+    const inner = sliceWithBreaks(text, r.start, r.end, breaks);
     if (r.kind === "term") {
       html += `<mark>${inner}</mark>`;
     } else if (r.kind === "quotation") {
@@ -154,7 +183,7 @@ function rangesToHtml(text, ranges) {
     }
     pos = r.end;
   });
-  html += escapeHtml(text.slice(pos));
+  html += sliceWithBreaks(text, pos, text.length, breaks);
   return html;
 }
 
@@ -260,8 +289,8 @@ function computeSections(esvVerses, hits) {
 
 function renderEsvCellText(el) {
   const text = el.dataset.original;
-  const ranges = buildBaseRanges(el.closest(".verse-cell").dataset.verse);
-  el.innerHTML = ranges.length ? rangesToHtml(text, ranges) : escapeHtml(text);
+  const id = el.closest(".verse-cell").dataset.verse;
+  el.innerHTML = rangesToHtml(text, buildBaseRanges(id), esvBreaks[id]);
 }
 
 function showState(state) {
@@ -359,6 +388,13 @@ function render(data) {
   verseIds.forEach((id, i) => { versePosition[id] = i; });
   spansChapters = new Set(verseIds.map(verseChapter)).size > 1;
 
+  paragraphByVerse = {};
+  esvBreaks = {};
+  (data.translations.ESV || []).forEach((v) => {
+    paragraphByVerse[v.id] = v.paragraph;
+    esvBreaks[v.id] = v.breaks || [];
+  });
+
   discourseByVerse = {};
   (data.discourse_markers || []).forEach((m) => {
     (discourseByVerse[m.verse] ||= []).push({ start: m.start, end: m.end, category: m.category });
@@ -452,9 +488,16 @@ function renderGrid(data) {
   const rowByVerse = {};
   const dividers = []; // {row, section}
   const chapterBreaks = []; // {row, chapter}
+  const paragraphGaps = []; // {row} — a blank row where the author starts a new thought
+  const lastInParagraph = new Set();
   let rowCursor = 2; // row 1 is the column headers
   verseIds.forEach((id, idx) => {
-    if (idx > 0 && verseChapter(id) !== verseChapter(verseIds[idx - 1])) {
+    const prev = idx > 0 ? verseIds[idx - 1] : null;
+    const newChapter = prev && verseChapter(id) !== verseChapter(prev);
+    const newParagraph = prev && paragraphByVerse[id] !== paragraphByVerse[prev];
+    if (newParagraph && prev) lastInParagraph.add(prev);
+
+    if (newChapter) {
       chapterBreaks.push({ row: rowCursor, chapter: verseChapter(id) });
       rowCursor++;
     }
@@ -462,8 +505,15 @@ function renderGrid(data) {
       dividers.push({ row: rowCursor, section: sectionAt[id] });
       rowCursor++;
     }
+    // a chapter divider or section divider already separates these rows, so
+    // don't stack a blank one on top of it
+    if (newParagraph && !newChapter && !sectionAt[id]) {
+      paragraphGaps.push({ row: rowCursor });
+      rowCursor++;
+    }
     rowByVerse[id] = rowCursor++;
   });
+  if (verseIds.length) lastInParagraph.add(verseIds[verseIds.length - 1]);
   grid.style.gridTemplateRows = `auto repeat(${rowCursor - 2}, auto)`;
   // set dynamically rather than in CSS — fewer active translations means
   // each gets more width instead of leaving the freed columns blank
@@ -479,6 +529,14 @@ function renderGrid(data) {
     h.style.gridRow = 1;
     if (i === lastColIdx) h.style.borderRight = "none";
     grid.appendChild(h);
+  });
+
+  paragraphGaps.forEach(({ row }) => {
+    const gap = document.createElement("div");
+    gap.className = "paragraph-gap";
+    gap.style.gridColumn = `1 / span ${visibleColumns.length}`;
+    gap.style.gridRow = row;
+    grid.appendChild(gap);
   });
 
   chapterBreaks.forEach(({ row, chapter }) => {
@@ -504,6 +562,10 @@ function renderGrid(data) {
     data.translations[c].forEach((v) => {
       const cell = document.createElement("div");
       cell.className = "verse-cell";
+      if (v.poetry) cell.classList.add("poetry");
+      // the row-separating rule sits only on the last verse of a paragraph, so
+      // a paragraph reads as one block rather than a stack of boxed rows
+      if (lastInParagraph.has(v.id)) cell.classList.add("paragraph-end");
       cell.dataset.col = c;
       cell.dataset.verse = v.id;
       cell.style.gridColumn = colIdx + 1;
@@ -522,7 +584,9 @@ function renderGrid(data) {
       if (c === "ESV") {
         renderEsvCellText(textSpan);
       } else {
-        textSpan.textContent = v.text;
+        // no analysis overlays on the other columns, but they carry their own
+        // poetry line breaks, so a psalm reads as verse in every column
+        textSpan.innerHTML = sliceWithBreaks(v.text, 0, v.text.length, v.breaks);
       }
 
       const notes = data.footnotes.filter((f) => f.translation === c && f.verse === v.id);
@@ -948,7 +1012,7 @@ function applyHighlightRegex(regex, verseIdList) {
     const other = baseRanges.filter((r) => !isSentiment(r));
     const sentiment = subtractRanges(baseRanges.filter(isSentiment), termRanges);
     const ranges = [...other, ...sentiment, ...termRanges].sort((a, b) => a.start - b.start);
-    el.innerHTML = rangesToHtml(text, ranges);
+    el.innerHTML = rangesToHtml(text, ranges, esvBreaks[id]);
   });
   const firstCell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${verseIdList[0]}"]`);
   if (firstCell) firstCell.scrollIntoView({ behavior: "smooth", block: "center" });

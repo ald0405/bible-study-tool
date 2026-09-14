@@ -254,12 +254,19 @@ def fetch_esv(ref):
 # BSB / NET / FBV — helloao.org, public domain, disk-cached
 # ---------------------------------------------------------------------------
 
+# Bumped when the cached shape changes, so old files are refetched rather than
+# silently serving a payload missing newer fields (poetry breaks, at v2).
+HELLOAO_CACHE_FORMAT = 2
+
+
 def fetch_helloao_chapter(translation_code, book_id, chapter):
     translation = TRANSLATIONS[translation_code]
     cache_path = os.path.join(CACHE_DIR, translation, f"{book_id}_{chapter}.json")
     if os.path.exists(cache_path):
         with open(cache_path) as f:
-            return json.load(f)
+            cached = json.load(f)
+        if cached.get("format") == HELLOAO_CACHE_FORMAT:
+            return cached
 
     url = f"{HELLOAO_BASE}/{translation}/{book_id}/{chapter}.json"
     with urllib.request.urlopen(url, timeout=15) as resp:
@@ -270,25 +277,49 @@ def fetch_helloao_chapter(translation_code, book_id, chapter):
         if item.get("type") == "verse":
             # content parts are either plain strings, poetry lines
             # ({"text": ..., "poem": N}), or non-text markers (footnote
-            # callouts {"noteId": N}, {"lineBreak": ...}) — join the textual
-            # parts with a space, then clean up doubled/pre-punctuation spaces.
-            parts = []
+            # callouts {"noteId": N}, {"lineBreak": ...}). Join the textual
+            # parts with a space, cleaning up doubled/pre-punctuation spaces,
+            # and record the offset of each separator that begins a poetry
+            # line so the frontend can break there — the same contract
+            # esv_html.parse uses, so the columns line up as poetry together
+            # rather than one column of verse beside four of prose.
+            pieces = []  # (text, poem level or None) — "poem": 1 is the base
             for part in item["content"]:
                 if isinstance(part, str):
-                    parts.append(part)
+                    pieces.append((part, None))
                 elif isinstance(part, dict) and "text" in part:
-                    parts.append(part["text"])
-            text = " ".join(parts)
-            text = re.sub(r"\s+", " ", text)
-            text = re.sub(r"\s+([,.;:!?])", r"\1", text).strip()
-            verses.append({"number": item["number"], "text": text})
+                    pieces.append((part["text"], part.get("poem")))
+
+            text = ""
+            breaks = []
+            for raw, poem_level in pieces:
+                piece = re.sub(r"\s+", " ", raw).strip()
+                piece = re.sub(r"\s+([,.;:!?])", r"\1", piece)
+                if not piece:
+                    continue
+                if text:
+                    if poem_level is not None:
+                        breaks.append({"offset": len(text), "indent": max(0, poem_level - 1)})
+                        text += " "
+                    elif piece[0] not in ",.;:!?":
+                        text += " "
+                text += piece
+
+            textual = [p for p in pieces if p[0].strip()]
+            verses.append({
+                "number": item["number"],
+                "text": text,
+                "breaks": breaks,
+                # wholly poetic, rather than a prose line introducing a quotation
+                "poetry": bool(textual) and all(level is not None for _, level in textual),
+            })
 
     footnotes = [
         {"verse": fn["reference"]["verse"], "text": fn["text"]}
         for fn in data["chapter"].get("footnotes", [])
     ]
 
-    result = {"verses": verses, "footnotes": footnotes}
+    result = {"format": HELLOAO_CACHE_FORMAT, "verses": verses, "footnotes": footnotes}
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(result, f)
