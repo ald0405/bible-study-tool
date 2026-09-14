@@ -897,3 +897,227 @@ mark {
   }
   .structure-minimap { position: static; }
 }
+
+
+/* --- Cross-reference map ---------------------------------------------------
+   A passage-level view of the apparatus, as a drawer rather than a sidebar
+   panel: a wide passage cites dozens of books and the positional strips need
+   room. No backdrop on purpose — clicking a mark scrolls the grid behind, and
+   you want to see it happen. */
+
+.xref-map-open {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.7rem;
+  padding: 0.45rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.xref-map-open:hover { filter: brightness(0.97); }
+
+.xref-map {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 40;
+  width: min(480px, 92vw);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: -6px 0 24px rgba(0, 0, 0, 0.08);
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+}
+
+.xref-map.open { transform: none; }
+
+.xref-map-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.2rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.xref-map-head h3 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  color: var(--accent);
+}
+
+#xref-map-summary {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.xref-map-close {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+
+.xref-map-close:hover { color: var(--text); }
+
+.xref-map-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.9rem 1.2rem 2rem;
+}
+
+/* chapter ticks, so a multi-chapter strip can be read against the chapters */
+.xref-ruler {
+  position: relative;
+  height: 1rem;
+  margin: 0 0 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.xref-tick {
+  position: absolute;
+  transform: translateX(-2px);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  border-left: 1px solid var(--border);
+  padding-left: 0.2rem;
+  white-space: nowrap;
+}
+
+.xref-row { margin-bottom: 0.5rem; }
+
+.xref-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.25rem 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.xref-row-head::before {
+  content: "";
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid var(--text-muted);
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transition: transform 0.15s ease;
+}
+
+.xref-row.expanded .xref-row-head::before { transform: rotate(90deg); }
+
+.xref-book { font-weight: 600; flex: 1; }
+
+.xref-count {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.xref-quote-count { color: var(--accent); font-weight: 600; }
+
+.xref-internal {
+  font-family: var(--sans);
+  font-style: italic;
+  letter-spacing: 0;
+}
+
+/* The strip itself. The --weight bar behind the marks carries the ranking, so
+   the ordering reads without counting individual marks. */
+.xref-strip {
+  position: relative;
+  height: 16px;
+  margin-bottom: 0.15rem;
+  border-radius: 2px;
+  background:
+    linear-gradient(to right, var(--accent-soft) 0 var(--weight, 0%), transparent var(--weight, 0%))
+    , var(--bg);
+  cursor: default;
+}
+
+.xref-mark {
+  position: absolute;
+  top: 3px;
+  width: 2px;
+  height: 10px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--cat-neutral);
+  cursor: pointer;
+}
+
+.xref-mark:hover { background: var(--text); }
+
+/* a direct quotation is a stronger claim than a parallel, so it reads heavier */
+.xref-mark-quote {
+  top: 0;
+  width: 3px;
+  height: 16px;
+  background: var(--accent);
+}
+
+.xref-links {
+  margin: 0.2rem 0 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--border);
+}
+
+.xref-link {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  border: none;
+  background: none;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.xref-link:hover { background: var(--accent-soft); }
+
+.xref-link-from {
+  flex-shrink: 0;
+  min-width: 3.2em;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.xref-link-to { flex: 1; color: var(--link); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .xref-map { width: 100vw; }
+}

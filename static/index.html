@@ -59,6 +59,7 @@
           <details class="panel" id="crossref-panel">
             <summary>Cross References <span class="panel-count" id="crossref-count"></span></summary>
             <p class="panel-hint">Click a verse to see related passages, from the ESV's own official cross-reference apparatus. Entries badged "Quotation" are direct quotations — also highlighted inline in the ESV column; others are thematic/verbal parallels.</p>
+            <button id="xref-map-open" class="xref-map-open">Map the whole passage &rarr;</button>
             <div id="crossref-list"><p class="muted">No verse selected.</p></div>
           </details>
           <details class="panel" id="glossary-panel">
@@ -70,6 +71,21 @@
       </div>
     </div>
   </main>
+
+  <!-- Passage-level view of the cross-reference apparatus: which books this
+       passage draws on, and where in it each one is leaned on. Deliberately a
+       drawer rather than a sidebar panel — a wide passage cites dozens of
+       books, and the positional strips need the room. -->
+  <aside id="xref-map" class="xref-map" role="dialog" aria-label="Cross-reference map" aria-hidden="true">
+    <div class="xref-map-head">
+      <div>
+        <h3 id="xref-map-title"></h3>
+        <p id="xref-map-summary"></p>
+      </div>
+      <button id="xref-map-close" class="xref-map-close" aria-label="Close">&times;</button>
+    </div>
+    <div id="xref-map-body" class="xref-map-body"></div>
+  </aside>
 
   <div id="tooltip" class="tooltip hidden"></div>
 

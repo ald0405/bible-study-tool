@@ -15,7 +15,11 @@ annotation you can turn on or off:
   in a sidebar panel, grouped by category.
 - A cross references panel lists related passages for whichever verse you
   click, each with a short preview and a note on whether it is a direct
-  quotation or a thematic parallel.
+  quotation or a thematic parallel. From it you can open a map of the whole
+  passage: one strip per book the passage cites, ordered by weight and
+  positioned across the passage, so you can see both how heavily a source is
+  used and where in the argument it is leaned on. Expand a book for the
+  individual links.
 - A tone panel gives a plain language sentiment reading of the passage
   (Positive, Negative, Mixed, and so on) using NLTK's VADER lexicon, with
   every word that drove the score listed and clickable so you can see exactly
@@ -131,11 +135,14 @@ something like `Eph 1:1-14`, `John 3:16`, or `Psalm 23` and search.
 | `Jonah 3-4` | whole chapters 3 to 4 |
 | `Eph 1:15-2:10` | verse 15 of chapter 1 through verse 10 of chapter 2 |
 | `Jude 3-5` | verses, since Jude only has one chapter |
+| `Philemon 5` | verse 5, for the same reason |
 
 A dash with no colon anywhere means chapters, so `Romans 9-11` is the whole
 argument rather than three verses. The exception is the five single-chapter
-books (Obadiah, Philemon, 2 John, 3 John, Jude), where a bare range can only
-mean verses.
+books (Obadiah, Philemon, 2 John, 3 John, Jude): there is no chapter 5 of
+Philemon, so a bare number or range can only mean verses, which is also how
+the ESV's own cross references cite them. `Jude 1` is left meaning the whole
+book, since that is the only way to ask for it.
 
 A passage can span at most five chapters. Past that, a first-time request means
 four API round trips per chapter, and a single chapter can be large on its own
@@ -172,6 +179,17 @@ four API round trips per chapter, and a single chapter can be large on its own
   only for New. Without that it would cheerfully report that Shalom, Ruach
   and Elohim are all present in Ephesians, which is a Greek epistle — the
   trigger word "god" says nothing about the language a book was written in.
+- **The cross reference map** is the same apparatus as the per verse panel,
+  grouped by the book being cited. The panel answers "what does this verse
+  connect to"; the map answers "what does this passage draw on", which is
+  usually the more interesting question and was impossible to ask before.
+  Ephesians 1 reaches for Colossians twenty one times, which is the twin
+  letter relationship showing up in the data. Romans 9 to 11 leans on Isaiah
+  twenty times with most of its direct quotations among them, and those
+  quotations cluster in the middle third rather than spreading evenly, so you
+  can see where Paul reaches for which source. References back into the
+  passage's own book are marked, since a letter referring to itself is a
+  different kind of link from a scriptural citation.
 - **Paragraphs and poetry** come from the ESV's own markup, which the app was
   previously parsing and discarding: `<p>` for Crossway's paragraphing,
   `<p class="block-indent">` plus `<span class="indent line">` for poetry and

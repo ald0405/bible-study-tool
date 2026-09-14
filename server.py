@@ -128,15 +128,25 @@ def parse_reference(raw):
     end_chapter = int(end_chapter) if end_chapter else None
     end_number = int(end_number) if end_number else None
 
+    single_chapter_book = book["chapters"] == 1
+
     if vstart is None and end_number is not None and end_chapter is None:
         # "Jonah 3-4" — no colon anywhere, so the numbers are chapters, unless
         # the book only has one chapter and they can only be verses
-        if book["chapters"] == 1:
+        if single_chapter_book:
             chapter, chapter_end = 1, 1
             verse_start, verse_end = first, end_number
         else:
             chapter, chapter_end = first, end_number
             verse_start = verse_end = None
+    elif vstart is None and end_number is None and single_chapter_book and first > 1:
+        # "Philemon 5", "Jude 25" — how a one-chapter book is conventionally
+        # cited, and how the ESV's own apparatus writes it. There is no chapter
+        # 5 of Philemon, so a bare number can only be a verse. `first == 1` is
+        # left alone so "Jude 1" still means the whole book, which is the only
+        # way to ask for it.
+        chapter = chapter_end = 1
+        verse_start = verse_end = first
     else:
         chapter = first
         verse_start = vstart
@@ -390,6 +400,50 @@ def glossary_for_book(book_id):
     return [entry for entry in GLOSSARY if entry["language"] == language]
 
 
+def cross_reference_sources(cross_references, book_id):
+    """Everything this passage points at, grouped by the book it points to and
+    ordered by weight.
+
+    The Cross References panel answers "what does this verse connect to", one
+    verse at a time. It cannot answer "what does this passage draw on", which
+    is the more interesting question: Ephesians 1 reaches for Colossians 21
+    times, and Romans 9-11 for Isaiah 20 times with most of its direct
+    quotations among them. Each link keeps the verse it came from, so the
+    frontend can plot where in the passage a source is leaned on rather than
+    only how often.
+    """
+    groups = {}
+    for verse, entries in cross_references.items():
+        for entry in entries:
+            for ref in entry["refs"]:
+                target = parse_reference(ref)
+                if not target:  # an apparatus form this parser doesn't know
+                    continue
+                group = groups.setdefault(target["book_id"], {
+                    "book_id": target["book_id"],
+                    "book_name": target["book_name"],
+                    "order": BOOKS_BY_ID[target["book_id"]]["order"],
+                    "testament": "NT" if BOOKS_BY_ID[target["book_id"]]["order"] >= OT_NT_BOUNDARY_ORDER else "OT",
+                    # the passage's own book — a letter referring back to itself
+                    # is a different kind of link from a scriptural citation
+                    "internal": target["book_id"] == book_id,
+                    "links": [],
+                })
+                group["links"].append({
+                    "verse": verse,
+                    "ref": ref,
+                    "is_quotation": entry["is_quotation"],
+                    "title": entry["title"],
+                })
+    result = []
+    for group in groups.values():
+        group["count"] = len(group["links"])
+        group["quotations"] = sum(1 for link in group["links"] if link["is_quotation"])
+        result.append(group)
+    result.sort(key=lambda g: (-g["count"], g["order"]))
+    return result
+
+
 def crossref_preview(target_display, max_len=110):
     """Short BSB preview snippet for a cross-reference target like 'Philippians
     2:9-11', so you can see what the connection actually is without navigating
@@ -525,6 +579,8 @@ def build_passage_response(ref):
         all_sections = niv.fetch_sections(CONFIG, CACHE_DIR, ref["book_id"])
         section_headings = relevant_section_headings(all_sections, passage_start, passage_end)
 
+    sources = cross_reference_sources(cross_references, ref["book_id"])
+
     return {
         "reference": {
             "book_id": ref["book_id"],
@@ -539,6 +595,7 @@ def build_passage_response(ref):
         "translations": translations,
         "footnotes": all_footnotes,
         "cross_references": cross_references,
+        "cross_reference_sources": sources,
         "ot_quotations": ot_quotations,
         "woc_spans": woc_spans,
         "glossary": glossary_hits,

@@ -21,6 +21,12 @@ const els = {
   summaryCount: document.getElementById("summary-count"),
   tooltip: document.getElementById("tooltip"),
   structureMinimap: document.getElementById("structure-minimap"),
+  xrefMap: document.getElementById("xref-map"),
+  xrefMapTitle: document.getElementById("xref-map-title"),
+  xrefMapSummary: document.getElementById("xref-map-summary"),
+  xrefMapBody: document.getElementById("xref-map-body"),
+  xrefMapOpen: document.getElementById("xref-map-open"),
+  xrefMapClose: document.getElementById("xref-map-close"),
 };
 
 // one colour per discourse-marker category, shared by the minimap, the
@@ -422,6 +428,7 @@ function render(data) {
   renderSentiment(data);
   renderGlossary(data);
   renderSummary(data);
+  if (xrefMapIsOpen()) renderXrefMap();
   els.crossrefList.innerHTML = '<p class="muted">Click a verse to see related passages.</p>';
   const crossrefTotal = Object.values(data.cross_references || {}).reduce((sum, refs) => sum + refs.length, 0);
   setPanelCount("crossref-count", crossrefTotal);
@@ -1246,6 +1253,155 @@ function renderSummaryContent(summary) {
   footer.textContent = "Written by Claude from the analysis on this page — interpretation, not data.";
   els.summaryContent.appendChild(footer);
 }
+
+// --- Cross-reference map ----------------------------------------------------
+// The Cross References panel answers "what does this verse connect to", one
+// verse at a time. It cannot answer "what does this passage draw on" — that
+// Ephesians 1 reaches for Colossians 21 times, or that Romans 9-11 leans on
+// Isaiah 20 times with most of its direct quotations among them. This is that
+// view: one strip per cited book, positioned across the passage, so weight and
+// placement read at once.
+
+function xrefMapIsOpen() {
+  return els.xrefMap.classList.contains("open");
+}
+
+function openXrefMap() {
+  renderXrefMap();
+  els.xrefMap.classList.add("open");
+  els.xrefMap.setAttribute("aria-hidden", "false");
+  els.xrefMapClose.focus();
+}
+
+function closeXrefMap() {
+  els.xrefMap.classList.remove("open");
+  els.xrefMap.setAttribute("aria-hidden", "true");
+}
+
+// Where a verse sits along the passage, 0-1. Used for the left offset of every
+// mark, so the strips line up with each other and with the reading order.
+function passageFraction(verseIdValue) {
+  const span = Math.max(1, verseIds.length - 1);
+  return (versePosition[verseIdValue] || 0) / span;
+}
+
+function buildXrefStrip(group) {
+  const strip = document.createElement("div");
+  strip.className = "xref-strip";
+  // quotations last so they paint over parallels at the same position
+  [...group.links]
+    .sort((a, b) => Number(a.is_quotation) - Number(b.is_quotation))
+    .forEach((link) => {
+      const mark = document.createElement("span");
+      mark.className = link.is_quotation ? "xref-mark xref-mark-quote" : "xref-mark";
+      mark.style.left = `${passageFraction(link.verse) * 100}%`;
+      mark.title = `${verseLabel(link.verse)} → ${link.ref}${link.is_quotation ? " (quotation)" : ""}`;
+      mark.addEventListener("click", (e) => {
+        e.stopPropagation();
+        jumpToVerse(link.verse);
+      });
+      strip.appendChild(mark);
+    });
+  return strip;
+}
+
+function buildXrefLinkList(group) {
+  const list = document.createElement("div");
+  list.className = "xref-links";
+  [...group.links]
+    .sort((a, b) => versePosition[a.verse] - versePosition[b.verse])
+    .forEach((link) => {
+      const row = document.createElement("button");
+      row.className = "xref-link";
+      const badge = link.is_quotation ? '<span class="cr-quote-badge">Quotation</span>' : "";
+      row.innerHTML =
+        `<span class="xref-link-from">${escapeHtml(verseLabel(link.verse))}</span>` +
+        `<span class="xref-link-to">${escapeHtml(link.ref)}</span>${badge}`;
+      row.title = link.title;
+      row.addEventListener("click", () => {
+        closeXrefMap();
+        loadPassage(link.ref, { context: true });
+      });
+      list.appendChild(row);
+    });
+  return list;
+}
+
+function renderXrefMap() {
+  const sources = (currentData && currentData.cross_reference_sources) || [];
+  els.xrefMapTitle.textContent = currentData ? currentData.reference.display : "";
+  els.xrefMapBody.innerHTML = "";
+
+  if (sources.length === 0) {
+    els.xrefMapSummary.textContent = "";
+    els.xrefMapBody.innerHTML = '<p class="muted">No cross-references in this passage.</p>';
+    return;
+  }
+
+  const total = sources.reduce((n, g) => n + g.count, 0);
+  const quotations = sources.reduce((n, g) => n + g.quotations, 0);
+  const ot = sources.filter((g) => g.testament === "OT").reduce((n, g) => n + g.count, 0);
+  els.xrefMapSummary.textContent =
+    `${total} references to ${sources.length} books · ${quotations} direct quotation${quotations === 1 ? "" : "s"} · ` +
+    `${ot} Old Testament, ${total - ot} New`;
+
+  // a ruler, so a multi-chapter strip can be read against the chapters
+  if (spansChapters) {
+    const ruler = document.createElement("div");
+    ruler.className = "xref-ruler";
+    let seen = null;
+    verseIds.forEach((id) => {
+      const chapter = verseChapter(id);
+      if (chapter === seen) return;
+      seen = chapter;
+      const tick = document.createElement("span");
+      tick.className = "xref-tick";
+      tick.style.left = `${passageFraction(id) * 100}%`;
+      tick.textContent = id;
+      ruler.appendChild(tick);
+    });
+    els.xrefMapBody.appendChild(ruler);
+  }
+
+  const maxCount = Math.max(...sources.map((g) => g.count));
+  sources.forEach((group) => {
+    const row = document.createElement("div");
+    row.className = "xref-row";
+
+    const head = document.createElement("button");
+    head.className = "xref-row-head";
+    head.setAttribute("aria-expanded", "false");
+    const marks = group.quotations > 0 ? ` <span class="xref-quote-count">${group.quotations} quoted</span>` : "";
+    const internal = group.internal ? ' <span class="xref-internal">within this book</span>' : "";
+    head.innerHTML =
+      `<span class="xref-book">${escapeHtml(group.book_name)}</span>` +
+      `<span class="xref-count">${group.count}${marks}${internal}</span>`;
+    row.appendChild(head);
+
+    // a weight bar behind the strip, so the ranking reads without counting marks
+    const strip = buildXrefStrip(group);
+    strip.style.setProperty("--weight", `${(group.count / maxCount) * 100}%`);
+    row.appendChild(strip);
+
+    const links = buildXrefLinkList(group);
+    links.classList.add("hidden");
+    row.appendChild(links);
+
+    head.addEventListener("click", () => {
+      const open = links.classList.toggle("hidden");
+      head.setAttribute("aria-expanded", String(!open));
+      row.classList.toggle("expanded", !open);
+    });
+
+    els.xrefMapBody.appendChild(row);
+  });
+}
+
+els.xrefMapOpen.addEventListener("click", openXrefMap);
+els.xrefMapClose.addEventListener("click", closeXrefMap);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && xrefMapIsOpen()) closeXrefMap();
+});
 
 function renderGlossary(data) {
   els.glossaryList.innerHTML = "";
