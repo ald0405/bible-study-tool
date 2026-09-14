@@ -7,6 +7,13 @@ marker to the exact phrase it annotates. When that phrase is an actual
 quotation of another passage, the title is prefixed "Cited from ..." — that's
 the signal used to distinguish quotations from plain thematic references.
 
+The HTML also carries the passage's own shape, which is worth keeping: <p>
+marks Crossway's paragraphing (the author's thought units, and a better
+answer to "where are the sections" than any marker heuristic), <p
+class="block-indent"> marks poetry, and <br> marks a poetry line break. Each
+verse therefore reports which paragraph it belongs to, whether that paragraph
+is poetry, and the offsets of any line breaks inside its own text.
+
 A passage can span several chapters, so a verse is identified here by a
 (chapter, verse) pair rather than a bare number — verse numbers restart at
 each chapter boundary. The ESV HTML marks a new chapter with
@@ -41,6 +48,18 @@ class _EsvHtmlParser(HTMLParser):
         self.current_verse = None  # (chapter, verse) key, or None before the first verse
         self.verse_order = []
         self.texts = {}  # (chapter, verse) -> accumulated, already-normalized text
+
+        # Passage shape. paragraph_index counts <p> tags that actually contain
+        # a verse; pending_paragraph holds one that has opened but not yet
+        # reached its first verse (Crossway emits some empty paragraphs).
+        self.paragraph_index = -1
+        self.pending_paragraph = None  # {"poetry": bool} once a <p> has opened
+        self.verse_paragraph = {}  # (chapter, verse) -> paragraph index
+        self.poetry_paragraphs = set()
+        self.breaks = {}  # (chapter, verse) -> [{"offset", "indent"}, ...]
+        # a <br> sets this; the <span class="line"> that follows supplies the
+        # indent level, since the break's own tag carries no depth
+        self.pending_break = None
 
         self.in_verse_num = False
         self.verse_num_buffer = ""
@@ -83,6 +102,13 @@ class _EsvHtmlParser(HTMLParser):
         if key not in self.texts:
             self.verse_order.append(key)
             self.texts[key] = ""
+        if key not in self.verse_paragraph:
+            if self.pending_paragraph is not None:
+                self.paragraph_index += 1
+                if self.pending_paragraph["poetry"]:
+                    self.poetry_paragraphs.add(self.paragraph_index)
+                self.pending_paragraph = None
+            self.verse_paragraph[key] = max(self.paragraph_index, 0)
 
     def handle_starttag(self, tag, attrs):
         classes = _classes(attrs)
@@ -123,6 +149,12 @@ class _EsvHtmlParser(HTMLParser):
             return
 
         if tag == "span":
+            if "line" in classes and self.pending_break is not None:
+                verse, offset = self.pending_break
+                self.breaks.setdefault(verse, []).append(
+                    {"offset": offset, "indent": 1 if "indent" in classes else 0}
+                )
+                self.pending_break = None
             if "woc" in classes:
                 self.span_stack.append("woc")
                 offset = len(self.texts.get(self.current_verse, "")) if self.current_verse is not None else 0
@@ -133,13 +165,26 @@ class _EsvHtmlParser(HTMLParser):
 
         if tag == "p":
             kind = "block-indent" if "block-indent" in classes else "other"
+            # a paragraph only counts once a verse lands in it — see _set_verse
+            self.pending_paragraph = {"poetry": kind == "block-indent"}
             verse_at_open = self.current_verse
             len_at_open = len(self.texts.get(verse_at_open, "")) if verse_at_open is not None else 0
             self.p_stack.append((kind, verse_at_open, len_at_open))
             return
 
         if tag == "br":
-            self._append(self.current_verse, " ")
+            # a poetry line break. The space is still appended exactly as before
+            # so that every other annotation's character offsets stay valid;
+            # the offset of that space is recorded so the frontend can render a
+            # line break there instead. A break with no text before it is a
+            # break *between* verses, which the reading grid's rows already
+            # express, so it is not recorded.
+            verse = self.current_verse
+            if verse is not None:
+                current = self.texts.get(verse, "")
+                if current and not current.endswith(" "):
+                    self.pending_break = (verse, len(current))
+            self._append(verse, " ")
             return
 
     def handle_endtag(self, tag):
@@ -238,7 +283,18 @@ def parse(html, start_chapter):
     for key in parser.verse_order:
         text = parser.texts.get(key, "")
         text = re.sub(r"\(\s*\)\s*$", "", text).rstrip()
-        verses.append({"chapter": key[0], "number": key[1], "text": text})
+        paragraph = parser.verse_paragraph.get(key, 0)
+        verses.append({
+            "chapter": key[0],
+            "number": key[1],
+            "text": text,
+            "paragraph": paragraph,
+            "poetry": paragraph in parser.poetry_paragraphs,
+            # the rstrip above can drop a trailing break's space; a break at
+            # the very end of a verse is a break *between* verses, which the
+            # reading grid's rows already express
+            "breaks": [b for b in parser.breaks.get(key, []) if b["offset"] < len(text)],
+        })
 
     citations = [
         _public_citation(c)

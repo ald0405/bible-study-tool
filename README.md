@@ -20,6 +20,12 @@ annotation you can turn on or off:
   (Positive, Negative, Mixed, and so on) using NLTK's VADER lexicon, with
   every word that drove the score listed and clickable so you can see exactly
   why. There is also a toggle to highlight all of that tone language inline.
+- The passage keeps its own shape. Paragraphs are the ones Crossway marks in
+  the ESV, which are the author's own thought units rather than anything this
+  tool guessed at, and they show as a break between rows. Poetry is set as
+  poetry, line by line, with the second limb of a couplet indented under the
+  first, because in Hebrew verse that parallelism is the meaning and not a
+  layout choice.
 - A top terms panel lists repeated words and phrases in the passage.
 - A key terms glossary matches around 40 hand curated Hebrew and Greek
   theological terms (grace, covenant, agape, and so on) against whatever
@@ -166,6 +172,17 @@ four API round trips per chapter, and a single chapter can be large on its own
   only for New. Without that it would cheerfully report that Shalom, Ruach
   and Elohim are all present in Ephesians, which is a Greek epistle — the
   trigger word "god" says nothing about the language a book was written in.
+- **Paragraphs and poetry** come from the ESV's own markup, which the app was
+  previously parsing and discarding: `<p>` for Crossway's paragraphing,
+  `<p class="block-indent">` plus `<span class="indent line">` for poetry and
+  its indent levels. That matters because the app already had three competing
+  answers to "where are the sections" — the NIV publisher's headings, the
+  discourse-marker breaks, and the summary — and was missing the one actually
+  present in the text. For Ephesians 1 the paragraphs are 1, 2, 3-10, 11-14
+  and 15-23; the 3-10 / 11-14 boundary is real and none of the other three
+  could see it. The other translations carry their own poetry markers from
+  bible.helloao.org, so a psalm reads as verse in every column rather than one
+  column of poetry beside four of prose.
 - **Multi-chapter passages** work because a verse is identified by
   `chapter:verse` rather than a bare number, which restarts at every chapter
   boundary. The reading grid, the minimap and the section spans all do their
