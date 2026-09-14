@@ -209,11 +209,24 @@ main#app {
 .verse-cell.paragraph-end { border-bottom: 1px solid var(--border); }
 
 /* Poetry gets a hanging indent, so a line that wraps is visibly a continuation
-   rather than a new line of verse. */
-.verse-cell.poetry .verse-text {
-  display: inline-block;
-  padding-left: 1.1em;
-  text-indent: -1.1em;
+   rather than a new line of verse. The indent lives on the cell rather than on
+   the text span: an inline-block span claims its own line, which pushed the
+   verse badge onto the line above it. text-indent pulls only the first line
+   back, so the badge sits where it does in a prose cell and every following
+   line — including each <br> of a poetry couplet — hangs. */
+.verse-cell.poetry {
+  padding-left: 2.2rem;
+  text-indent: -1.1rem;
+}
+
+/* text-indent is inherited, and these each establish their own inline
+   formatting context, so without this the indent is applied a second time
+   inside them — pulling the verse number out of its badge and the footnote
+   dagger back over the word before it. */
+.verse-cell.poetry .verse-badge,
+.verse-cell.poetry .note-marker,
+.verse-cell.poetry .pline-indent {
+  text-indent: 0;
 }
 
 /* The indented second limb of a couplet. Inline-block so it is valid inside
@@ -984,10 +997,14 @@ mark {
 }
 
 /* chapter ticks, so a multi-chapter strip can be read against the chapters */
+/* sticky, so the chapter marks stay readable while scrolling forty book rows */
 .xref-ruler {
-  position: relative;
-  height: 1rem;
-  margin: 0 0 0.4rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 1.15rem;
+  margin: 0 0 0.6rem;
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
@@ -1002,7 +1019,54 @@ mark {
   white-space: nowrap;
 }
 
-.xref-row { margin-bottom: 0.5rem; }
+.xref-section { margin-bottom: 1.4rem; }
+
+.xref-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.1rem;
+  padding-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.xref-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.xref-section-count {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.xref-section-hint {
+  margin: 0.3rem 0 0.6rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.xref-more-toggle {
+  margin-top: 0.2rem;
+  padding: 0.2rem 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+
+.xref-more-toggle:hover { text-decoration: underline; }
+
+.xref-row { margin-bottom: 0.55rem; }
 
 .xref-row-head {
   display: flex;
@@ -1037,50 +1101,59 @@ mark {
 
 .xref-count {
   flex-shrink: 0;
+  min-width: 1.6em;
+  text-align: right;
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
-.xref-quote-count { color: var(--accent); font-weight: 600; }
-
-.xref-internal {
-  font-family: var(--sans);
-  font-style: italic;
-  letter-spacing: 0;
+.xref-quote-count {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
 }
 
-/* The strip itself. The --weight bar behind the marks carries the ranking, so
-   the ordering reads without counting individual marks. */
+/* The strip is purely positional: left to right is the passage, start to end.
+   It carries no fill behind the marks — a bar growing from the left reads as
+   "cited through the first 40% of the passage", which is exactly the thing the
+   marks are already saying and was not what the bar meant. The count in the
+   row heading carries the weight instead. */
 .xref-strip {
   position: relative;
-  height: 16px;
-  margin-bottom: 0.15rem;
+  height: 18px;
+  margin-bottom: 0.35rem;
   border-radius: 2px;
-  background:
-    linear-gradient(to right, var(--accent-soft) 0 var(--weight, 0%), transparent var(--weight, 0%))
-    , var(--bg);
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--border-faint);
   cursor: default;
 }
 
 .xref-mark {
   position: absolute;
-  top: 3px;
-  width: 2px;
-  height: 10px;
-  margin-left: -1px;
+  top: 5px;
+  width: 3px;
+  height: 8px;
+  margin-left: -1.5px;
   border-radius: 1px;
   background: var(--cat-neutral);
   cursor: pointer;
 }
 
-.xref-mark:hover { background: var(--text); }
+.xref-mark:hover { background: var(--text); height: 14px; top: 2px; }
 
-/* a direct quotation is a stronger claim than a parallel, so it reads heavier */
+/* A direct quotation is a far stronger claim than an editorial parallel, so it
+   reads as a different mark rather than a slightly thicker one. */
 .xref-mark-quote {
   top: 0;
-  width: 3px;
-  height: 16px;
+  width: 4px;
+  height: 18px;
+  margin-left: -2px;
   background: var(--accent);
 }
 
