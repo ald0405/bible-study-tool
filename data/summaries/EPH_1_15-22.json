@@ -127,8 +127,25 @@
     }
   ],
   "purpose": [
-    "Paul wants us to know the power at work in believers is the same power that raised Christ, so that we stop measuring it by our own strength.",
-    "He prays for enlightened eyes rather than new gifts, because what the Ephesians lack is not provision but sight of what they already hold.",
-    "He wants us to believe Christ's universal rule was given for the church, so that cosmic authority reads as personal care, not distant power."
+    {
+      "statement": "Paul wants us to know the power at work in believers is the same power that raised Christ, so that we stop measuring it by our own strength.",
+      "verses": [
+        "1:19",
+        "1:20"
+      ]
+    },
+    {
+      "statement": "He prays for enlightened eyes rather than new gifts, because what the Ephesians lack is not provision but sight of what they already hold.",
+      "verses": [
+        "1:17",
+        "1:18"
+      ]
+    },
+    {
+      "statement": "He wants us to believe Christ's universal rule was given for the church, so that cosmic authority reads as personal care, not distant power.",
+      "verses": [
+        "1:22"
+      ]
+    }
   ]
 }

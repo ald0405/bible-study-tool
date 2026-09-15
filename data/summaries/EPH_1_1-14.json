@@ -1,0 +1,155 @@
+{
+  "reference": "Ephesians 1:1-14",
+  "generated_at": 1789495191.828609,
+  "sections": [
+    {
+      "title": "Greeting",
+      "start": "1:1",
+      "end": "1:2",
+      "line": "Paul writes as an apostle by God's will, not his own."
+    },
+    {
+      "title": "Chosen before the foundation",
+      "start": "1:3",
+      "end": "1:6",
+      "line": "Election stated as praise, closing on the first refrain."
+    },
+    {
+      "title": "Redeemed, and let in on the plan",
+      "start": "1:7",
+      "end": "1:12",
+      "line": "Blood-bought forgiveness, then the secret: everything gathered into Christ."
+    },
+    {
+      "title": "Sealed and guaranteed",
+      "start": "1:13",
+      "end": "1:14",
+      "line": "The Spirit as deposit on an inheritance not yet paid."
+    }
+  ],
+  "themes": [
+    {
+      "theme": "In him",
+      "note": "Every blessing is located in him, never merely alongside him.",
+      "verses": [
+        "1:3",
+        "1:4",
+        "1:7",
+        "1:10",
+        "1:11",
+        "1:13"
+      ],
+      "triggers": [
+        "in him",
+        "in christ",
+        "in the beloved"
+      ]
+    },
+    {
+      "theme": "To the praise of his glory",
+      "note": "The refrain closing each movement, naming the whole point.",
+      "verses": [
+        "1:6",
+        "1:12",
+        "1:14"
+      ],
+      "triggers": [
+        "praise of his glory",
+        "praise of his glorious"
+      ]
+    },
+    {
+      "theme": "According to his will",
+      "note": "Each gift traced to God's purpose, never to our merit.",
+      "verses": [
+        "1:5",
+        "1:7",
+        "1:9",
+        "1:11"
+      ],
+      "triggers": [
+        "according to"
+      ]
+    },
+    {
+      "theme": "Chosen and predestined",
+      "note": "Settled before the world began, and repeated to make it stick.",
+      "verses": [
+        "1:4",
+        "1:5",
+        "1:11"
+      ],
+      "triggers": [
+        "chose",
+        "chosen",
+        "predestined"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "ref": "Deuteronomy 7:6",
+      "verses": [
+        "1:4"
+      ],
+      "kind": "parallel",
+      "why": "Israel's own election language \u2014 a people treasured and chosen \u2014 handed to a largely Gentile church without apology."
+    },
+    {
+      "ref": "Deuteronomy 4:20",
+      "verses": [
+        "1:11"
+      ],
+      "kind": "parallel",
+      "why": "Israel was God's portion and inheritance; Paul transfers that status, so Gentile believers inherit rather than merely benefit."
+    },
+    {
+      "ref": "Romans 8:29\u201330",
+      "verses": [
+        "1:5"
+      ],
+      "kind": "parallel",
+      "why": "Paul's fuller chain from foreknowledge to glory, so predestination reads here as pastoral assurance rather than abstract decree."
+    },
+    {
+      "ref": "Colossians 1:14",
+      "verses": [
+        "1:7"
+      ],
+      "kind": "parallel",
+      "why": "Near-identical wording in the twin letter, showing redemption-as-forgiveness was settled phrasing for Paul, not improvised here."
+    },
+    {
+      "ref": "2 Corinthians 1:22",
+      "verses": [
+        "1:14"
+      ],
+      "kind": "parallel",
+      "why": "The same commercial word for a deposit, so the Spirit is a down payment on something already bought."
+    }
+  ],
+  "purpose": [
+    {
+      "statement": "Paul wants us to know our standing was settled before the world existed, so that nothing that happens inside it can unsettle it.",
+      "verses": [
+        "1:4",
+        "1:5",
+        "1:11"
+      ]
+    },
+    {
+      "statement": "He wants us to believe God has disclosed one plan \u2014 everything gathered into Christ \u2014 because our own salvation only makes sense as part of it.",
+      "verses": [
+        "1:9",
+        "1:10"
+      ]
+    },
+    {
+      "statement": "He wants us to read the Spirit as a deposit rather than a reward, so that assurance rests on what God has paid, not on our progress.",
+      "verses": [
+        "1:13",
+        "1:14"
+      ]
+    }
+  ]
+}

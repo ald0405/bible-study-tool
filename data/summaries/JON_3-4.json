@@ -125,8 +125,26 @@
     }
   ],
   "purpose": [
-    "The author wants us to know God relents when a people turn, because the threat in a prophet's mouth was always an invitation rather than a verdict.",
-    "He wants us to watch Jonah grieve a dead plant more than a living city, so that we notice how small our own pity has become.",
-    "He wants us to believe that mercy reaches past Israel to 120,000 strangers and their cattle, because the book ends on that question and never answers it."
+    {
+      "statement": "The author wants us to know God relents when a people turn, because the threat in a prophet's mouth was always an invitation rather than a verdict.",
+      "verses": [
+        "3:9",
+        "3:10",
+        "4:2"
+      ]
+    },
+    {
+      "statement": "He wants us to watch Jonah grieve a dead plant more than a living city, so that we notice how small our own pity has become.",
+      "verses": [
+        "4:10",
+        "4:11"
+      ]
+    },
+    {
+      "statement": "He wants us to believe that mercy reaches past Israel to 120,000 strangers and their cattle, because the book ends on that question and never answers it.",
+      "verses": [
+        "4:11"
+      ]
+    }
   ]
 }
