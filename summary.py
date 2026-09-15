@@ -36,7 +36,7 @@ SCHEMA_HINT = {
     "sections": "3-5 items, the argument's real movements: {title, start, end, line} where start/end are verse ids",
     "themes": "3-4 items: {theme, note, verses[] (verse ids), triggers[]}",
     "references": "up to 5 items: {ref, verses[] (verse ids), kind: quotation|parallel, why}",
-    "purpose": "2-3 strings, each 'X wants us to know/believe ... so that/because ...'",
+    "purpose": "2-3 items: {statement: 'X wants us to know/believe ... so that/because ...', verses[] (verse ids the claim rests on)}",
 }
 
 

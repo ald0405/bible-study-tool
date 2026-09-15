@@ -143,8 +143,26 @@
     }
   ],
   "purpose": [
-    "Paul wants us to know Abraham was justified before he was circumcised, so that Gentile believers are not second-tier children.",
-    "He wants us to believe righteousness is credited rather than earned, because a wage can be claimed but a gift can only be received.",
-    "He wants us to read Genesis as written for us, so that the same faith that answered a dead womb can answer an empty tomb."
+    {
+      "statement": "Paul wants us to know Abraham was justified before he was circumcised, so that Gentile believers are not second-tier children.",
+      "verses": [
+        "4:10",
+        "4:11"
+      ]
+    },
+    {
+      "statement": "He wants us to believe righteousness is credited rather than earned, because a wage can be claimed but a gift can only be received.",
+      "verses": [
+        "4:4",
+        "4:5"
+      ]
+    },
+    {
+      "statement": "He wants us to read Genesis as written for us, so that the same faith that answered a dead womb can answer an empty tomb.",
+      "verses": [
+        "4:23",
+        "4:24"
+      ]
+    }
   ]
 }

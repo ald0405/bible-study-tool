@@ -1176,10 +1176,34 @@ function renderSummaryContent(summary) {
   // three scrolls down past the section list.
   if ((summary.purpose || []).length) {
     const block = summaryBlock("Why this was written");
-    summary.purpose.forEach((line) => {
+    summary.purpose.forEach((entry) => {
+      // summaries written before purpose statements carried their verses are
+      // plain strings; they still render, just without the citation
+      const statement = typeof entry === "string" ? entry : entry.statement;
+      const verses = (typeof entry === "string" ? [] : entry.verses || []).map(toVerseId);
+
       const p = document.createElement("p");
       p.className = "summary-purpose";
-      p.textContent = line;
+      p.textContent = statement;
+
+      // These are the most interpretive lines in the panel, so they carry the
+      // verses they rest on and each one jumps to its verse — the claim is
+      // checkable against the text rather than taken on trust.
+      if (verses.length) {
+        const refs = document.createElement("span");
+        refs.className = "summary-purpose-refs";
+        refs.append(verses.length === 1 ? "v. " : "vv. ");
+        verses.forEach((id, i) => {
+          if (i > 0) refs.append(", ");
+          const btn = document.createElement("button");
+          btn.className = "summary-purpose-ref";
+          btn.textContent = verseLabel(id);
+          btn.title = `Go to ${id}`;
+          btn.addEventListener("click", () => jumpToVerse(id));
+          refs.appendChild(btn);
+        });
+        p.appendChild(refs);
+      }
       block.appendChild(p);
     });
     els.summaryContent.appendChild(block);

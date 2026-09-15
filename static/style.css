@@ -809,6 +809,28 @@ mark {
   color: var(--text);
 }
 
+.summary-purpose-refs {
+  display: inline;
+  margin-left: 0.35rem;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.summary-purpose-ref {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+
+.summary-purpose-ref:hover { text-decoration: underline; }
+
 .summary-section,
 .summary-theme,
 .summary-reference {

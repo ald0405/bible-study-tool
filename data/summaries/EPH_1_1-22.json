@@ -108,8 +108,27 @@
     }
   ],
   "purpose": [
-    "Paul wants us to know our standing was settled before the world began, so that nothing happening later can unsettle it.",
-    "He wants us to believe God has one plan \u2014 to gather everything into Christ \u2014 so that our own salvation reads as part of it.",
-    "He prays for enlightened eyes rather than new gifts, because what the Ephesians lack is not provision but sight of what they hold."
+    {
+      "statement": "Paul wants us to know our standing was settled before the world began, so that nothing happening later can unsettle it.",
+      "verses": [
+        "1:4",
+        "1:5",
+        "1:11"
+      ]
+    },
+    {
+      "statement": "He wants us to believe God has one plan \u2014 to gather everything into Christ \u2014 so that our own salvation reads as part of it.",
+      "verses": [
+        "1:9",
+        "1:10"
+      ]
+    },
+    {
+      "statement": "He prays for enlightened eyes rather than new gifts, because what the Ephesians lack is not provision but sight of what they hold.",
+      "verses": [
+        "1:17",
+        "1:18"
+      ]
+    }
   ]
 }

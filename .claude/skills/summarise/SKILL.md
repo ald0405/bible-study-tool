@@ -50,7 +50,8 @@ Do all pending requests in one pass, not just the first.
       "why": "Recasts a victory procession so the spoils become gifts to the church." }
   ],
   "purpose": [
-    "Paul wants the Ephesians to believe their standing was settled before they existed, so that nothing later can unsettle it."
+    { "statement": "Paul wants the Ephesians to believe their standing was settled before they existed, so that nothing later can unsettle it.",
+      "verses": ["1:4", "1:5"] }
   ]
 }
 ```
@@ -84,7 +85,14 @@ so the church reads the cross as planned, not as defeat" is the job. ≤ 25 word
 **Purpose — 2 to 3.** The form is fixed: *"[Author] wants us to know/believe X
 so that / because Y."* Both halves are required — a claim with no consequence
 isn't a purpose statement. These are the punchiest lines in the panel, so make
-them land. ≤ 30 words each.
+them land. `statement` ≤ 30 words.
+
+Each one also carries the `verses` it is drawn from, so the reader can check
+the claim against the text rather than taking it on trust — these are the most
+interpretive lines in the panel and the ones most worth being able to audit.
+Cite the verses the claim actually rests on, usually two or three; if you
+cannot point at specific verses, the claim is too vague and needs rewriting
+rather than a longer list.
 
 ## Rules
 
