@@ -1,0 +1,159 @@
+{
+  "reference": "Acts 19",
+  "generated_at": 1789668952.55832,
+  "sections": [
+    {
+      "title": "John's baptism completed",
+      "start": "19:1",
+      "end": "19:7",
+      "line": "Twelve who knew only John's baptism receive the Spirit."
+    },
+    {
+      "title": "Out of the synagogue, into the lecture hall",
+      "start": "19:8",
+      "end": "19:10",
+      "line": "Three months arguing, then two years daily; all Asia hears."
+    },
+    {
+      "title": "Whose name is it?",
+      "start": "19:11",
+      "end": "19:20",
+      "line": "Exorcists borrow the name, get mauled; the magic books burn."
+    },
+    {
+      "title": "Resolved: Jerusalem, then Rome",
+      "start": "19:21",
+      "end": "19:22",
+      "line": "The travel plan that governs the rest of Acts."
+    },
+    {
+      "title": "The riot",
+      "start": "19:23",
+      "end": "19:41",
+      "line": "A silversmith's trade, two hours of chanting, a clerk's warning."
+    }
+  ],
+  "themes": [
+    {
+      "theme": "The name",
+      "note": "A power others try to borrow, and cannot.",
+      "verses": [
+        "19:5",
+        "19:13",
+        "19:17"
+      ],
+      "triggers": [
+        "the name"
+      ]
+    },
+    {
+      "theme": "Spirit against spirits",
+      "note": "The Spirit given, and unclean spirits that know the difference.",
+      "verses": [
+        "19:2",
+        "19:6",
+        "19:12",
+        "19:15",
+        "19:16"
+      ],
+      "triggers": [
+        "holy spirit",
+        "evil spirit",
+        "evil spirits"
+      ]
+    },
+    {
+      "theme": "The word of the Lord",
+      "note": "Luke's refrain, marking each stage the mission clears.",
+      "verses": [
+        "19:10",
+        "19:20"
+      ],
+      "triggers": [
+        "the word of the lord"
+      ]
+    },
+    {
+      "theme": "Great is Artemis",
+      "note": "A goddess, a trade, and a city defending both.",
+      "verses": [
+        "19:24",
+        "19:27",
+        "19:28",
+        "19:34",
+        "19:35"
+      ],
+      "triggers": [
+        "artemis"
+      ]
+    }
+  ],
+  "references": [
+    {
+      "ref": "Acts 8:16",
+      "verses": [
+        "19:2"
+      ],
+      "kind": "parallel",
+      "why": "The Samaritans believed without receiving the Spirit too, so Luke is repeating a pattern rather than reporting an Ephesian oddity."
+    },
+    {
+      "ref": "James 2:19",
+      "verses": [
+        "19:15"
+      ],
+      "kind": "parallel",
+      "why": "Demons know and shudder; the evil spirit has better information than the exorcists, and knowing the name is not faith."
+    },
+    {
+      "ref": "Acts 6:7",
+      "verses": [
+        "19:20"
+      ],
+      "kind": "parallel",
+      "why": "The third of Luke's growth refrains, marking the mission clearing another stage rather than just reporting success."
+    },
+    {
+      "ref": "Acts 23:11",
+      "verses": [
+        "19:21"
+      ],
+      "kind": "parallel",
+      "why": "Rome is announced here and reached in chapter 28, so this verse sets the course for the rest of Acts."
+    },
+    {
+      "ref": "Isaiah 44:10\u201320",
+      "verses": [
+        "19:26"
+      ],
+      "kind": "parallel",
+      "why": "Paul's line about man-made gods is Israel's standard idol polemic, which Demetrius hears as a threat to trade."
+    }
+  ],
+  "purpose": [
+    {
+      "statement": "Luke wants us to know the Spirit is given rather than conjured, because the name works for those baptised into it and mauls those who borrow it.",
+      "verses": [
+        "19:5",
+        "19:13",
+        "19:16"
+      ]
+    },
+    {
+      "statement": "He wants us to see the gospel cost Ephesus fifty thousand drachmas and a trade, so that conversion reads as expensive rather than merely sincere.",
+      "verses": [
+        "19:19",
+        "19:25",
+        "19:27"
+      ]
+    },
+    {
+      "statement": "He wants us to believe the mission advances through opposition, because the riot ends with a pagan official declaring the Christians guilty of nothing.",
+      "verses": [
+        "19:20",
+        "19:37",
+        "19:40"
+      ]
+    }
+  ]
+}

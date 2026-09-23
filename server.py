@@ -11,6 +11,7 @@ time, merges:
     (public domain, no storage restriction)
   - a curated key-terms glossary
   - NLTK-based repeated word/phrase analysis
+  - who is the subject of each verb, its voice and mood (see agency.py)
   - an on-demand, Claude-written summary of all of the above (see summary.py)
 
 Run with `make run` (after `make setup`).
@@ -26,6 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from dotenv import load_dotenv
 
+import agency
 import discourse
 import esv_html
 import niv
@@ -568,6 +570,7 @@ def build_passage_response(ref):
     terms = termanalysis.analyze(base_verses)
     discourse_markers = discourse.find_markers(esv_verses)
     sentiment_result = sentiment.analyze(base_verses)
+    agency_result = agency.analyze(esv_verses)
 
     # editorial section headings (e.g. "Made Alive in Christ") from NIV's
     # publisher — always fetched regardless of which translation columns are
@@ -602,6 +605,7 @@ def build_passage_response(ref):
         "terms": terms,
         "discourse_markers": discourse_markers,
         "sentiment": sentiment_result,
+        "agency": agency_result,
         "section_headings": section_headings,
         "fums_token": fums_token,
     }

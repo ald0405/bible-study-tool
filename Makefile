@@ -26,13 +26,20 @@ run:
 	uv run python server.py
 
 # Background — starts the server detached and returns control immediately.
+# Waits for the port to accept connections rather than a fixed sleep: loading
+# spaCy's parser puts startup at roughly 1.5s, so a flat `sleep 1` would report
+# success while the first request still got connection-refused.
 start:
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
 		echo "Already running (PID $$(cat $(PID_FILE))) at http://localhost:$(PORT)"; \
 	else \
 		nohup uv run python server.py > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE); \
-		sleep 1; \
-		if kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \
+		for i in $$(seq 1 60); do \
+			if ! kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then break; fi; \
+			if lsof -ti:$(PORT) >/dev/null 2>&1; then break; fi; \
+			sleep 0.2; \
+		done; \
+		if kill -0 $$(cat $(PID_FILE)) 2>/dev/null && lsof -ti:$(PORT) >/dev/null 2>&1; then \
 			echo "Started (PID $$(cat $(PID_FILE))) at http://localhost:$(PORT)"; \
 		else \
 			echo "Failed to start — check $(LOG_FILE)"; rm -f $(PID_FILE); exit 1; \

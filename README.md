@@ -30,6 +30,12 @@ annotation you can turn on or off:
   poetry, line by line, with the second limb of a couplet indented under the
   first, because in Hebrew verse that parallelism is the meaning and not a
   layout choice.
+- A "who acts" panel names the subject of every verb and marks passives and
+  commands, with a highlight you can turn on in the text. This is where you
+  see that Ephesians 1 is almost entirely things done *to* the reader — one
+  subject carries nine verbs (chose, predestined, lavished) while "we" only
+  ever be, have, obtain and acquire — and that the letter turns at chapter 4:
+  Ephesians 1 contains no imperatives at all, Ephesians 5 contains fourteen.
 - A top terms panel lists repeated words and phrases in the passage.
 - A key terms glossary matches around 40 hand curated Hebrew and Greek
   theological terms (grace, covenant, agape, and so on) against whatever
@@ -52,8 +58,8 @@ so you know there is something worth opening before you click.
   brew install uv
   ```
 
-- Two free API keys (see below). Everything else (NLTK data, the
-  cross reference and glossary data) is downloaded automatically by
+- Two free API keys (see below). Everything else (NLTK data, spaCy's English
+  model, the cross reference and glossary data) is downloaded automatically by
   `make setup`.
 
 ## API keys you need
@@ -101,8 +107,9 @@ Once your keys are in `.env`:
 make setup
 ```
 
-This installs Python dependencies with `uv` and downloads the NLTK data the
-tone and term analysis need (one time, a few seconds).
+This installs Python dependencies with `uv`, including spaCy's small English
+model for the verb analysis, and downloads the NLTK data the tone and term
+analysis need (one time, a few seconds).
 
 ## Running it
 
@@ -173,6 +180,20 @@ four API round trips per chapter, and a single chapter can be large on its own
   (`data/discourse_markers.json`) grounded in how the ESV, as an
   "essentially literal" translation, tends to preserve markers like "Behold"
   and sentence initial "For" that more idiomatic translations smooth over.
+- **Who acts** is a dependency parse of the ESV (spaCy's small English model,
+  12MB) reporting the subject of each verb, the voice, and the mood. Two of its
+  limits are deliberate, because the alternatives were tried and are wrong.
+  It analyses the *English*: Greek participles become English finite verbs and
+  some Greek passives become English actives, so this is the translation's
+  grammar rather than Paul's, which the panel says plainly. And it never
+  resolves a bare "he" or "they" to who it means. The obvious heuristic, taking
+  the most recent named subject, put "he chose us" in Ephesians 1:4 down to
+  *Paul*, "they baptized" in Acts 19:5 down to *John*, and "he says" in Romans
+  9:15 down to *Rebekah*. So a pronoun is listed as written and grouped on its
+  own, which still shows the pattern without the tool pretending to knowledge
+  it has not got. Divine names must be capitalised to count, which is how the
+  ESV itself separates "the Holy Spirit" from "the evil spirit" and "God" from
+  "gods made with hands".
 - **The glossary** (`data/glossary.json`) is a hand curated list, not pulled
   from an API. It matches English trigger words, so it is filtered by
   testament: Hebrew entries only appear for Old Testament books and Greek
@@ -266,6 +287,7 @@ niv.py                  fetches and caches NIV from api.bible
 termanalysis.py          repeated word and phrase detection (NLTK)
 discourse.py            discourse marker detection
 sentiment.py            tone analysis (NLTK VADER)
+agency.py               subject, voice and mood of every verb (spaCy)
 summary.py              passage summaries: request bundles, storage, optional API path
 booknames.py            book name and abbreviation parsing
 data/                   glossary, discourse marker bank, book list, on disk cache, summaries

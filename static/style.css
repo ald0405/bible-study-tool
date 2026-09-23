@@ -1216,3 +1216,115 @@ mark {
 @media (max-width: 900px) {
   .xref-map { width: 100vw; }
 }
+
+
+/* --- Who Acts ---------------------------------------------------------------
+   One colour per participant, drawn from the same palette the discourse
+   categories use so the page reads as one system. The subject is filled, the
+   verb underlined: you see who acts and what they do without the two competing.
+   A bare third-person pronoun gets its own neutral colour rather than being
+   dressed up as God — the app does not know who "he" is. */
+
+.agency-subject,
+.agency-verb {
+  --agency-color: var(--cat-neutral);
+  color: var(--agency-color);
+}
+
+.agency-subject[data-participant="God"],
+.agency-verb[data-participant="God"],
+.agency-subject[data-participant="third-person"],
+.agency-verb[data-participant="third-person"] { --agency-color: var(--cat-logical); }
+
+.agency-subject[data-participant="we"],
+.agency-verb[data-participant="we"] { --agency-color: var(--cat-temporal); }
+
+.agency-subject[data-participant="readers"],
+.agency-verb[data-participant="readers"] { --agency-color: var(--cat-contrastive); }
+
+.agency-subject[data-participant="author"],
+.agency-verb[data-participant="author"] { --agency-color: var(--cat-focus); }
+
+.agency-subject {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--agency-color) 14%, transparent);
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+
+.agency-verb {
+  font-weight: 600;
+  border-bottom: 2px solid var(--agency-color);
+}
+
+/* a passive puts the subject on the receiving end, so the verb is marked as
+   something done to them rather than by them */
+.agency-verb[data-voice="passive"] { border-bottom-style: dashed; }
+
+/* an imperative has no written subject — it is aimed at the reader */
+.agency-verb[data-mood="imperative"] {
+  border-bottom-width: 3px;
+  background: color-mix(in srgb, var(--agency-color) 12%, transparent);
+}
+
+.agency-stats {
+  margin: 0.5rem 0 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.agency-stats strong { color: var(--text); font-family: var(--mono); }
+
+.agency-group { margin-bottom: 0.55rem; }
+
+.agency-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.agency-who {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--cat-neutral);
+}
+
+.agency-group[data-participant="God"] .agency-who,
+.agency-group[data-participant="third-person"] .agency-who { color: var(--cat-logical); }
+.agency-group[data-participant="we"] .agency-who { color: var(--cat-temporal); }
+.agency-group[data-participant="readers"] .agency-who { color: var(--cat-contrastive); }
+.agency-group[data-participant="author"] .agency-who { color: var(--cat-focus); }
+
+.agency-n {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.agency-lemmas { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+
+.agency-lemma {
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.agency-lemma:hover { background: var(--accent-soft); }
+.agency-lemma.active { background: var(--mark-bg); border-color: var(--mark-bg); }
+
+.agency-note {
+  margin: 0.8rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
