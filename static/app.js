@@ -17,6 +17,7 @@ const els = {
   crossrefList: document.getElementById("crossref-list"),
   glossaryList: document.getElementById("glossary-list"),
   sentimentContent: document.getElementById("sentiment-content"),
+  agencyContent: document.getElementById("agency-content"),
   summaryContent: document.getElementById("summary-content"),
   summaryCount: document.getElementById("summary-count"),
   tooltip: document.getElementById("tooltip"),
@@ -73,6 +74,8 @@ let citationByVerse = {}; // verse number -> [{start, end, refs, title}] — dir
 let wocByVerse = {}; // verse number -> [{start, end}] — words of Christ
 let sentimentByVerse = {}; // verse number -> [{start, end, kind}] — only populated while the tone toggle is on
 let sentimentToggleOn = false;
+let agencyByVerse = {}; // verse id -> [{start, end, kind, participant, voice, mood}]
+let agencyToggleOn = false;
 let sections = []; // ordered [{start, end, opener}] — passage broken up at sentence-initial discourse markers
 let sectionHeadings = []; // ordered [{start, end, title}] — real editorial section titles from NIV's publisher
 let structureToggleOn = false;
@@ -123,6 +126,13 @@ function inReadingOrder(ids) {
 function toVerseId(value) {
   const raw = String(value);
   return raw.includes(":") ? raw : `${verseChapter(verseIds[0] || "1:1")}:${raw}`;
+}
+
+function agencyTitle(r) {
+  const parts = [r.kind === "agency-subject" ? `subject: ${r.label}` : `subject: ${r.label}`];
+  if (r.voice === "passive") parts.push("passive");
+  if (r.mood === "imperative") parts.push("imperative");
+  return parts.join(" · ");
 }
 
 function escapeHtml(s) {
@@ -180,6 +190,10 @@ function rangesToHtml(text, ranges, breaks) {
       html += `<span class="ot-quote" data-refs="${refsAttr}" data-title="${escapeHtml(r.title)}">${inner}</span>`;
     } else if (r.kind === "woc") {
       html += `<span class="woc-text" title="Words of Christ">${inner}</span>`;
+    } else if (r.kind === "agency-verb") {
+      html += `<span class="agency-verb" data-participant="${escapeHtml(r.participant)}" data-mood="${escapeHtml(r.mood)}" data-voice="${escapeHtml(r.voice)}" title="${escapeHtml(agencyTitle(r))}">${inner}</span>`;
+    } else if (r.kind === "agency-subject") {
+      html += `<span class="agency-subject" data-participant="${escapeHtml(r.participant)}" title="${escapeHtml(agencyTitle(r))}">${inner}</span>`;
     } else if (r.kind === "sentiment-positive") {
       html += `<span class="sentiment-positive" title="Positive tone">${inner}</span>`;
     } else if (r.kind === "sentiment-negative") {
@@ -225,16 +239,32 @@ function buildBaseRanges(verseId) {
   woc = subtractRanges(woc, quotations);
   const foreground = [...quotations, ...discourse, ...woc];
 
-  let sentiment = sentimentToggleOn ? (sentimentByVerse[verseId] || []) : [];
-  sentiment = subtractRanges(sentiment, foreground);
+  // Tone and agency are both full-passage washes, so they are mutually
+  // exclusive — running them together makes an unreadable page. Each yields to
+  // the quotation/discourse/words-of-Christ foreground the same way.
+  let wash = [];
+  if (agencyToggleOn) wash = agencyByVerse[verseId] || [];
+  else if (sentimentToggleOn) wash = sentimentByVerse[verseId] || [];
+  wash = subtractRanges(wash, foreground);
 
-  return [...foreground, ...sentiment].sort((a, b) => a.start - b.start);
+  return [...foreground, ...wash].sort((a, b) => a.start - b.start);
 }
 
 // Builds the verse->ranges map for every occurrence of the top
 // positive/negative words in currentData.sentiment, directly from the
 // fetched ESV verse text (not the DOM — this runs before renderGrid on a
 // fresh passage load, so the cells don't exist yet).
+// The agency spans arrive already keyed and offset by the server, so this is
+// just a regroup — unlike the tone wash, which has to be matched against the
+// text here. Kinds are prefixed so rangesToHtml can tell them apart.
+function buildAgencyByVerse(data) {
+  const map = {};
+  ((data.agency && data.agency.spans) || []).forEach((s) => {
+    (map[s.verse] ||= []).push({ ...s, kind: `agency-${s.kind}` });
+  });
+  return map;
+}
+
 function buildSentimentByVerse(esvVerses) {
   if (!currentData || !currentData.sentiment || !esvVerses) return {};
   const textByVerse = {};
@@ -418,14 +448,16 @@ function render(data) {
     (wocByVerse[w.verse] ||= []).push({ start: w.start, end: w.end });
   });
 
-  // rebuild for the new passage if the toggle was already on when we searched
+  // rebuild for the new passage if a toggle was already on when we searched
   sentimentByVerse = sentimentToggleOn ? buildSentimentByVerse(data.translations.ESV) : {};
+  agencyByVerse = agencyToggleOn ? buildAgencyByVerse(data) : {};
 
   renderTranslationPicker();
   renderGrid(data);
   renderTerms(data);
   renderDiscourseMarkers(data);
   renderSentiment(data);
+  renderAgency(data);
   renderGlossary(data);
   renderSummary(data);
   if (xrefMapIsOpen()) renderXrefMap();
@@ -722,6 +754,12 @@ function renderSentiment(data) {
   toggleInput.checked = sentimentToggleOn;
   toggleInput.addEventListener("change", () => {
     sentimentToggleOn = toggleInput.checked;
+    // one wash at a time — see buildBaseRanges
+    if (sentimentToggleOn && agencyToggleOn) {
+      agencyToggleOn = false;
+      agencyByVerse = {};
+      renderAgency(currentData);
+    }
     sentimentByVerse = sentimentToggleOn ? buildSentimentByVerse(currentData.translations.ESV) : {};
     clearTermHighlight(); // re-renders every ESV cell from buildBaseRanges, which now reflects the new toggle state
   });
@@ -1030,7 +1068,7 @@ function applyHighlightRegex(regex, verseIdList) {
 // at once (on top of the always-on discourse-marker highlighting).
 function setActiveHighlight(rowEl, regex, verseIdList) {
   const wasActive = rowEl.classList.contains("active");
-  document.querySelectorAll(".term-row.active, .glossary-entry.active").forEach((r) => r.classList.remove("active"));
+  document.querySelectorAll(".term-row.active, .glossary-entry.active, .agency-lemma.active").forEach((r) => r.classList.remove("active"));
   clearTermHighlight();
   if (!wasActive) {
     rowEl.classList.add("active");
@@ -1498,6 +1536,107 @@ els.xrefMapClose.addEventListener("click", closeXrefMap);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && xrefMapIsOpen()) closeXrefMap();
 });
+
+// --- Who Acts ---------------------------------------------------------------
+// The subject of each verb, grouped. Deliberately does not resolve third-person
+// pronouns: a bare "he" is its own row rather than being guessed at or folded
+// in with unrelated subjects — see agency.py for why the obvious heuristic was
+// rejected. In Ephesians 1 that row carries nine verbs (chose, predestined,
+// lavished) while "we" gets be/have/obtain, which is the whole observation.
+
+const AGENCY_ORDER = ["God", "third-person", "author", "we", "readers", "other"];
+
+function renderAgency(data) {
+  const container = els.agencyContent;
+  container.innerHTML = "";
+  const a = data.agency;
+  if (!a) {
+    setPanelCount("agency-count", 0);
+    container.innerHTML =
+      '<p class="muted">Verb analysis unavailable — run <code>make setup</code> to install the spaCy English model.</p>';
+    return;
+  }
+  setPanelCount("agency-count", a.verbs.length);
+
+  const toggleRow = document.createElement("label");
+  toggleRow.className = "toggle-row";
+  const toggleInput = document.createElement("input");
+  toggleInput.type = "checkbox";
+  toggleInput.checked = agencyToggleOn;
+  toggleInput.addEventListener("change", () => {
+    agencyToggleOn = toggleInput.checked;
+    // one wash at a time, or the page is unreadable
+    if (agencyToggleOn && sentimentToggleOn) {
+      sentimentToggleOn = false;
+      sentimentByVerse = {};
+      renderSentiment(currentData);
+    }
+    agencyByVerse = agencyToggleOn ? buildAgencyByVerse(currentData) : {};
+    clearTermHighlight(); // re-renders every ESV cell through buildBaseRanges
+  });
+  toggleRow.appendChild(toggleInput);
+  toggleRow.append("Highlight verbs and their subjects");
+  container.appendChild(toggleRow);
+
+  const imperatives = a.verbs.filter((v) => v.mood === "imperative").length;
+  const passives = a.verbs.filter((v) => v.voice === "passive").length;
+  const stats = document.createElement("p");
+  stats.className = "agency-stats";
+  stats.innerHTML =
+    `<strong>${a.verbs.length}</strong> verbs · <strong>${imperatives}</strong> imperative · ` +
+    `<strong>${passives}</strong> passive`;
+  container.appendChild(stats);
+
+  // group by the label the server assigned, ordered by weight within class
+  const groups = new Map();
+  a.verbs.forEach((v) => {
+    if (!groups.has(v.label)) groups.set(v.label, { label: v.label, participant: v.participant, verbs: [] });
+    groups.get(v.label).verbs.push(v);
+  });
+  const ordered = [...groups.values()].sort((x, y) => {
+    const rank = AGENCY_ORDER.indexOf(x.participant) - AGENCY_ORDER.indexOf(y.participant);
+    return rank !== 0 ? rank : y.verbs.length - x.verbs.length;
+  });
+
+  ordered.slice(0, 10).forEach((group) => {
+    const row = document.createElement("div");
+    row.className = "agency-group";
+    row.dataset.participant = group.participant;
+
+    const lemmas = [...new Set(group.verbs.map((v) => v.lemma))].sort();
+    const head = document.createElement("div");
+    head.className = "agency-group-head";
+    head.innerHTML =
+      `<span class="agency-who">${escapeHtml(group.label)}</span>` +
+      `<span class="agency-n">${group.verbs.length}</span>`;
+    row.appendChild(head);
+
+    const list = document.createElement("div");
+    list.className = "agency-lemmas";
+    lemmas.forEach((lemma) => {
+      const verses = group.verbs.filter((v) => v.lemma === lemma).map((v) => v.verse);
+      const chip = document.createElement("button");
+      chip.className = "agency-lemma";
+      chip.textContent = lemma;
+      chip.title = `${formatVerseList(inReadingOrder(verses))} — click to highlight`;
+      chip.addEventListener("click", () => {
+        const surfaces = [...new Set(group.verbs.filter((v) => v.lemma === lemma).map((v) => v.surface))];
+        const pattern = surfaces.map(escapeRegExp).join("|");
+        setActiveHighlight(chip, new RegExp(`\\b(${pattern})\\b`, "gi"), inReadingOrder(verses));
+      });
+      list.appendChild(chip);
+    });
+    row.appendChild(list);
+    container.appendChild(row);
+  });
+
+  const note = document.createElement("p");
+  note.className = "agency-note";
+  note.textContent =
+    "Parsed from the ESV, so this is the English translation's grammar, not the Greek. " +
+    "A bare \u201che\u201d or \u201cthey\u201d is listed as written rather than resolved to who it means.";
+  container.appendChild(note);
+}
 
 function renderGlossary(data) {
   els.glossaryList.innerHTML = "";
