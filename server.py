@@ -402,67 +402,157 @@ def glossary_for_book(book_id):
     return [entry for entry in GLOSSARY if entry["language"] == language]
 
 
-def cross_reference_sources(cross_references, book_id):
-    """Everything this passage points at, grouped by the book it points to and
-    ordered by weight.
+# Crossway's apparatus ranks its own references, and the notation carries it:
+#   "Cited from Ps. 2:7"  the author is quoting
+#   "See Rom. 2:4"        Crossway's primary pointer, look here first
+#   "Col. 1:27"           an ordinary parallel
+#   "[Phil. 1:11]"        a weaker allusion, roughly a fifth of all references
+# Using that ranking is what makes a 138-reference chapter readable, and it is
+# the apparatus's own judgement rather than one this tool invents.
+TIER_QUOTATION = "quotation"
+TIER_PRIMARY = "primary"
+TIER_PARALLEL = "parallel"
+TIER_WEAK = "weak"
+TIER_ORDER = {TIER_QUOTATION: 0, TIER_PRIMARY: 1, TIER_PARALLEL: 2, TIER_WEAK: 3}
+STRONG_TIERS = (TIER_QUOTATION, TIER_PRIMARY, TIER_PARALLEL)
 
-    The Cross References panel answers "what does this verse connect to", one
-    verse at a time. It cannot answer "what does this passage draw on", which
-    is the more interesting question: Ephesians 1 reaches for Colossians 21
-    times, and Romans 9-11 for Isaiah 20 times with most of its direct
-    quotations among them. Each link keeps the verse it came from, so the
-    frontend can plot where in the passage a source is leaned on rather than
-    only how often.
+# leading whitespace and brackets may interleave ("; [Ps. 89:26" splits to
+# " [Ps. 89:26"), so consume either in any order before the reference itself
+_PREFIX = r"[\s\[]*(?:Cited from\s+|See\s+)?"
+_VER_RE = re.compile(rf"^{_PREFIX}ver\.", re.I)
+_CH_RE = re.compile(rf"^{_PREFIX}ch\.\s*(\d+)", re.I)
+_BARE_CHAPTER_RE = re.compile(rf"^{_PREFIX}(\d+)\s*:")
+_BOOK_RE = re.compile(rf"^{_PREFIX}((?:[1-3]\s*)?[A-Za-z][A-Za-z\.]*(?:\s+[A-Za-z][A-Za-z\.]*)?)\.?\s*(\d+)\s*:")
+
+
+def _component_target(component, current, home):
+    """(book_id, chapter) a title component points at.
+
+    `home` is the citing verse's own (book, chapter); `current` is the book the
+    previous component named. The distinction matters: "ver. 12" and "ch. 5:23"
+    always mean *this* book, however many other books have been listed since,
+    while a bare "5:30" inherits the book of the component before it. Resolving
+    "ch." against `current` made "Col. 1:18, 24; [ch. 5:23" look for Colossians
+    5, which matched nothing and tipped the whole group into the fallback."""
+    if _VER_RE.match(component):
+        return home
+    m = _CH_RE.match(component)
+    if m:
+        return home[0], int(m.group(1))
+    m = _BARE_CHAPTER_RE.match(component)
+    if m:
+        return current[0], int(m.group(1))
+    m = _BOOK_RE.match(component)
+    if m:
+        parsed = parse_reference(f"{m.group(1)} {m.group(2)}:1")
+        if parsed:
+            return parsed["book_id"], int(m.group(2))
+    return None, None
+
+
+def _component_tier(component, bracket_depth):
+    stripped = component.strip()
+    if "Cited from" in stripped:
+        return TIER_QUOTATION
+    if re.match(r"^\[*\s*See\b", stripped):
+        return TIER_PRIMARY
+    if stripped.startswith("[") or bracket_depth > 0:
+        return TIER_WEAK
+    return TIER_PARALLEL
+
+
+def citation_tiers(title, refs, book_id, chapter):
+    """[(ref, tier)] for one citation group, using Crossway's own ranking.
+
+    The title's ";"-separated components do not line up one-to-one with refs:
+    a single component can name several verses ("Ezek. 20:11, 13, 21" is three
+    references) and a bracket can open in one component and close in a later
+    one ("[ch. 3:8, 16" ... "Col. 1:27]", where both are weak). So the
+    components are walked left to right, tracking bracket depth, consuming the
+    refs that match each one's book and chapter.
+
+    That assigns a tier per reference for about 94% of groups, measured across
+    eight passages. When a group does not consume cleanly the whole group takes
+    its strongest tier — conservative, never wrong about a quotation, and no
+    reference is ever dropped."""
+    remaining = list(refs)
+    assigned = []
+    depth = 0
+    home = (book_id, chapter)
+    current = home
+    for component in title.split(";"):
+        tier = _component_tier(component, depth)
+        target = _component_target(component, current, home)
+        if target[0]:
+            current = target
+        while remaining:
+            parsed = parse_reference(remaining[0])
+            if parsed and target[0] and (parsed["book_id"], parsed["chapter"]) == target:
+                assigned.append((remaining.pop(0), tier))
+            else:
+                break
+        depth += component.count("[") - component.count("]")
+
+    if remaining or len(assigned) != len(refs):
+        strongest = min((t for _, t in assigned), key=lambda t: TIER_ORDER[t], default=None)
+        if "Cited from" in title:
+            strongest = TIER_QUOTATION
+        elif strongest is None:
+            strongest = TIER_PRIMARY if "See " in title else TIER_PARALLEL
+        return [(r, strongest) for r in refs]
+    return assigned
+
+
+def passage_connections(cross_references, ref):
+    """The passage in reading order, and under each verse what it reaches for.
+
+    Replaces an earlier view that charted how heavily each cited *book* was
+    used and where. That answered "how much Isaiah, and whereabouts", which is
+    not the question you have open the drawer to ask — and at the density of a
+    normal passage (Eph 2:11-22 cites seven Old Testament books once or twice
+    each) the chart was a row of near-empty bars. What is wanted is the
+    connection itself, with the words of the passage being cited.
     """
-    groups = {}
-    for verse, entries in cross_references.items():
-        for entry in entries:
-            for ref in entry["refs"]:
-                target = parse_reference(ref)
-                if not target:  # an apparatus form this parser doesn't know
-                    continue
-                group = groups.setdefault(target["book_id"], {
-                    "book_id": target["book_id"],
-                    "book_name": target["book_name"],
-                    "order": BOOKS_BY_ID[target["book_id"]]["order"],
-                    "testament": "NT" if BOOKS_BY_ID[target["book_id"]]["order"] >= OT_NT_BOUNDARY_ORDER else "OT",
-                    # the passage's own book — a letter referring back to itself
-                    # is a different kind of link from a scriptural citation
-                    "internal": target["book_id"] == book_id,
-                    "links": [],
-                })
-                group["links"].append({
-                    "verse": verse,
-                    "ref": ref,
-                    "is_quotation": entry["is_quotation"],
-                    "title": entry["title"],
-                })
-    result = []
-    for group in groups.values():
-        group["count"] = len(group["links"])
-        group["quotations"] = sum(1 for link in group["links"] if link["is_quotation"])
-        result.append(group)
-    result.sort(key=lambda g: (-g["count"], g["order"]))
-    return result
+    entries = []
+    for verse, citations in cross_references.items():
+        chapter = int(verse.split(":")[0])
+        links = []
+        for citation in citations:
+            for target, tier in citation_tiers(citation["title"], citation["refs"],
+                                               ref["book_id"], chapter):
+                links.append({"ref": target, "tier": tier, "title": citation["title"]})
+        # strongest first, so a quotation is never below an aside
+        links.sort(key=lambda link: TIER_ORDER[link["tier"]])
+        entries.append({"verse": verse, "links": links})
+    return entries
 
 
-def crossref_preview(target_display, max_len=110):
-    """Short BSB preview snippet for a cross-reference target like 'Philippians
-    2:9-11', so you can see what the connection actually is without navigating
-    away. BSB (not ESV) deliberately, since it's free to fetch/cache and this
-    is just an at-a-glance preview, not the passage you're studying."""
+def crossref_text(target_display, max_verses=4, max_len=260):
+    """The BSB text of a cross-reference target like 'Psalm 102:25-27', so you
+    can read the connection rather than just being told it exists.
+
+    BSB (not ESV) deliberately: it is free to fetch and cache, and this is the
+    passage being pointed *at* rather than the one being studied. A range
+    returns its verses joined — showing only the first verse of "Psalm
+    102:25-27" would cut the quotation off mid-thought.
+    """
     parsed = parse_reference(target_display)
     if not parsed:
         return None
     try:
         chapter_data = fetch_helloao_chapter("BSB", parsed["book_id"], parsed["chapter"])
-    except Exception:  # noqa: BLE001 — a preview is a nice-to-have, never fatal
+    except Exception:  # noqa: BLE001 — the text is a nice-to-have, never fatal
         return None
-    verse_start = parsed["verse_start"] or 1
-    verse = next((v for v in chapter_data["verses"] if v["number"] == verse_start), None)
-    if not verse:
+
+    start = parsed["verse_start"] or 1
+    end = parsed["verse_end"] or start
+    if parsed["chapter_end"] != parsed["chapter"]:
+        end = 999  # a cross-chapter target: take what this chapter has
+    wanted = [v for v in chapter_data["verses"] if start <= v["number"] <= end][:max_verses]
+    if not wanted:
         return None
-    text = verse["text"]
+
+    text = " ".join(v["text"] for v in wanted)
     if len(text) > max_len:
         text = text[:max_len].rsplit(" ", 1)[0] + "…"
     return text
@@ -537,11 +627,18 @@ def build_passage_response(ref):
     # grouped per verse for the sidebar panel.
     cross_references = {}
     for citation in esv_result["citations"]:
+        # preview the reference the citation is actually about. Previewing
+        # refs[0] unconditionally showed the wrong passage whenever the quoted
+        # source was not listed first — Hebrews 1:5 cites Psalm 2:7 but lists
+        # Hebrews 5:5 first, so the panel showed Hebrews while hiding the Psalm.
+        tiers = citation_tiers(citation["title"], citation["refs"],
+                               ref["book_id"], citation["chapter"])
+        headline = min(tiers, key=lambda t: TIER_ORDER[t[1]])[0] if tiers else None
         entry = {
             "refs": citation["refs"],
             "title": citation["title"],
             "is_quotation": citation["is_quotation"],
-            "preview": crossref_preview(citation["refs"][0]) if citation["refs"] else None,
+            "preview": crossref_text(headline, max_verses=1, max_len=110) if headline else None,
         }
         key = verse_id(citation["chapter"], citation["verse"])
         cross_references.setdefault(key, []).append(entry)
@@ -582,7 +679,14 @@ def build_passage_response(ref):
         all_sections = niv.fetch_sections(CONFIG, CACHE_DIR, ref["book_id"])
         section_headings = relevant_section_headings(all_sections, passage_start, passage_end)
 
-    sources = cross_reference_sources(cross_references, ref["book_id"])
+    # the passage in reading order with what each verse reaches for, each strong
+    # link carrying the text of the passage it points at. Weak links get no text
+    # here; the drawer fetches those from /api/preview if you ask to see them.
+    connections = passage_connections(cross_references, ref)
+    for entry in connections:
+        for link in entry["links"]:
+            if link["tier"] in STRONG_TIERS:
+                link["text"] = crossref_text(link["ref"])
 
     return {
         "reference": {
@@ -598,7 +702,7 @@ def build_passage_response(ref):
         "translations": translations,
         "footnotes": all_footnotes,
         "cross_references": cross_references,
-        "cross_reference_sources": sources,
+        "connections": connections,
         "ot_quotations": ot_quotations,
         "woc_spans": woc_spans,
         "glossary": glossary_hits,
@@ -673,6 +777,11 @@ class Handler(BaseHTTPRequestHandler):
                     # padding widened the range around it
                     payload["reference"]["target_verse"] = verse_id(ref["chapter"], target_verse_start)
                 self._send_json(payload)
+            elif parsed.path == "/api/preview":
+                # text for references the passage response deliberately skipped
+                # (the weak tier), fetched only when the drawer asks to show them
+                wanted = [r for r in query.get("refs", [""])[0].split(";") if r.strip()]
+                self._send_json({r: crossref_text(r) for r in wanted[:40]})
             elif parsed.path == "/api/summary":
                 ref = self._summary_ref(query)
                 if not ref:

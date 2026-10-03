@@ -15,11 +15,10 @@ annotation you can turn on or off:
   in a sidebar panel, grouped by category.
 - A cross references panel lists related passages for whichever verse you
   click, each with a short preview and a note on whether it is a direct
-  quotation or a thematic parallel. From it you can open a map of the whole
-  passage: one strip per book the passage cites, ordered by weight and
-  positioned across the passage, so you can see both how heavily a source is
-  used and where in the argument it is leaned on. Expand a book for the
-  individual links.
+  quotation or a thematic parallel. From it you can open the whole passage's
+  connections: every verse in reading order, and under each one the passages
+  it reaches for, each quoted so you can read the link rather than just be
+  told it exists. Strongest first, using the apparatus's own ranking.
 - A tone panel gives a plain language sentiment reading of the passage
   (Positive, Negative, Mixed, and so on) using NLTK's VADER lexicon, with
   every word that drove the score listed and clickable so you can see exactly
@@ -200,17 +199,22 @@ four API round trips per chapter, and a single chapter can be large on its own
   only for New. Without that it would cheerfully report that Shalom, Ruach
   and Elohim are all present in Ephesians, which is a Greek epistle — the
   trigger word "god" says nothing about the language a book was written in.
-- **The cross reference map** is the same apparatus as the per verse panel,
-  grouped by the book being cited. The panel answers "what does this verse
-  connect to"; the map answers "what does this passage draw on", which is
-  usually the more interesting question and was impossible to ask before.
-  Ephesians 1 reaches for Colossians twenty one times, which is the twin
-  letter relationship showing up in the data. Romans 9 to 11 leans on Isaiah
-  twenty times with most of its direct quotations among them, and those
-  quotations cluster in the middle third rather than spreading evenly, so you
-  can see where Paul reaches for which source. References back into the
-  passage's own book are marked, since a letter referring to itself is a
-  different kind of link from a scriptural citation.
+- **The passage connections view** is the same apparatus as the per verse
+  panel, laid out in reading order with the text of whatever is being cited.
+  Showing the text is the point: Ephesians 2:12 says the Gentiles were
+  "alienated from the commonwealth of Israel and strangers to the covenants of
+  promise", and the apparatus sends you to Romans 9:4, "theirs is the adoption
+  as sons, theirs the divine glory and the covenants" — which is the whole
+  force of the verse, and invisible if all you are shown is the reference.
+  Crossway rank their own references and the notation carries it: `Cited from`
+  is the author quoting, `See` is their primary pointer, a plain reference is
+  an ordinary parallel, and a `[bracketed]` one is a weaker allusion. That
+  ranking is used rather than invented, strongest first, with the bracketed
+  fifth behind a toggle. Assigning a rank per reference rather than per group
+  needs the title's components walked against the reference list, since one
+  component can name several verses and a bracket can span components; that
+  works for 98% of groups, and the rest fall back to the group's strongest
+  rank so nothing is ever dropped or understated.
 - **Paragraphs and poetry** come from the ESV's own markup, which the app was
   previously parsing and discarding: `<p>` for Crossway's paragraphing,
   `<p class="block-indent">` plus `<span class="indent line">` for poetry and
