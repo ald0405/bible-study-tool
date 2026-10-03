@@ -1340,195 +1340,135 @@ function closeXrefMap() {
   els.xrefMap.setAttribute("aria-hidden", "true");
 }
 
-// Where a verse sits along the passage, 0-1. Used for the left offset of every
-// mark, so the strips line up with each other and with the reading order.
-function passageFraction(verseIdValue) {
-  const span = Math.max(1, verseIds.length - 1);
-  return (versePosition[verseIdValue] || 0) / span;
-}
+const TIER_LABEL = { quotation: "Quotes", primary: "See", parallel: "", weak: "" };
+const WEAK_TIER = "weak";
+// Links per verse before the rest fold away. Hebrews 1:2 carries ten on its
+// own and Ephesians 1 carries 138 across the chapter; shown all at once the
+// drawer becomes the same wall it replaced. Links arrive strongest-first, so
+// what survives the cut is what the apparatus itself rates highest.
+const LINKS_PER_VERSE = 4;
+let xrefShowWeak = false;
 
-function buildXrefStrip(group) {
-  const strip = document.createElement("div");
-  strip.className = "xref-strip";
-  // quotations last so they paint over parallels at the same position
-  [...group.links]
-    .sort((a, b) => Number(a.is_quotation) - Number(b.is_quotation))
-    .forEach((link) => {
-      const mark = document.createElement("span");
-      mark.className = link.is_quotation ? "xref-mark xref-mark-quote" : "xref-mark";
-      mark.style.left = `${passageFraction(link.verse) * 100}%`;
-      mark.title = `${verseLabel(link.verse)} → ${link.ref}${link.is_quotation ? " (quotation)" : ""}`;
-      mark.addEventListener("click", (e) => {
-        e.stopPropagation();
-        jumpToVerse(link.verse);
-      });
-      strip.appendChild(mark);
-    });
-  return strip;
-}
-
-function buildXrefLinkList(group) {
-  const list = document.createElement("div");
-  list.className = "xref-links";
-  [...group.links]
-    .sort((a, b) => versePosition[a.verse] - versePosition[b.verse])
-    .forEach((link) => {
-      const row = document.createElement("button");
-      row.className = "xref-link";
-      const badge = link.is_quotation ? '<span class="cr-quote-badge">Quotation</span>' : "";
-      row.innerHTML =
-        `<span class="xref-link-from">${escapeHtml(verseLabel(link.verse))}</span>` +
-        `<span class="xref-link-to">${escapeHtml(link.ref)}</span>${badge}`;
-      row.title = link.title;
-      row.addEventListener("click", () => {
-        closeXrefMap();
-        loadPassage(link.ref, { context: true });
-      });
-      list.appendChild(row);
-    });
-  return list;
-}
-
-function buildXrefRuler() {
-  const ruler = document.createElement("div");
-  ruler.className = "xref-ruler";
-  const addTick = (id, label) => {
-    const tick = document.createElement("span");
-    tick.className = "xref-tick";
-    tick.style.left = `${passageFraction(id) * 100}%`;
-    tick.textContent = label;
-    ruler.appendChild(tick);
-  };
-
-  if (spansChapters) {
-    let seen = null;
-    verseIds.forEach((id) => {
-      const chapter = verseChapter(id);
-      if (chapter === seen) return;
-      seen = chapter;
-      addTick(id, id);
-    });
-  } else {
-    // one chapter, so chapter starts would give a single useless tick at the
-    // left edge — space verse marks across instead
-    const step = Math.max(1, Math.ceil(verseIds.length / 5));
-    for (let i = 0; i < verseIds.length; i += step) {
-      addTick(verseIds[i], `v${verseIds[i].split(":")[1]}`);
-    }
-  }
-  return ruler;
-}
-
-function buildXrefGroupRow(group, showQuotations) {
+function buildXrefLink(link) {
   const row = document.createElement("div");
-  row.className = "xref-row";
+  row.className = "xconn-link";
+  row.dataset.tier = link.tier;
 
   const head = document.createElement("button");
-  head.className = "xref-row-head";
-  head.setAttribute("aria-expanded", "false");
-  const quoted = showQuotations && group.quotations > 0
-    ? `<span class="xref-quote-count">${group.quotations} quoted</span>` : "";
-  head.innerHTML =
-    `<span class="xref-book">${escapeHtml(group.book_name)}</span>` +
-    `${quoted}<span class="xref-count">${group.count}</span>`;
-  row.appendChild(head);
-  row.appendChild(buildXrefStrip(group));
-
-  const links = buildXrefLinkList(group);
-  links.classList.add("hidden");
-  row.appendChild(links);
-
+  head.className = "xconn-ref";
+  const badge = TIER_LABEL[link.tier]
+    ? `<span class="xconn-badge">${escapeHtml(TIER_LABEL[link.tier])}</span>` : "";
+  head.innerHTML = `${badge}<span class="xconn-ref-name">${escapeHtml(link.ref)}</span>`;
+  head.title = link.title;
   head.addEventListener("click", () => {
-    const collapsed = links.classList.toggle("hidden");
-    head.setAttribute("aria-expanded", String(!collapsed));
-    row.classList.toggle("expanded", !collapsed);
+    closeXrefMap();
+    loadPassage(link.ref, { context: true });
   });
+  row.appendChild(head);
+
+  if (link.text) {
+    const quote = document.createElement("p");
+    quote.className = "xconn-text";
+    quote.textContent = `\u201c${link.text}\u201d`;
+    row.appendChild(quote);
+  }
   return row;
 }
 
-const XREF_VISIBLE_PER_GROUP = 8;
-
-function buildXrefSection(title, hint, groups, showQuotations) {
-  if (groups.length === 0) return null;
-  const section = document.createElement("section");
-  section.className = "xref-section";
-
-  const total = groups.reduce((n, g) => n + g.count, 0);
-  const heading = document.createElement("div");
-  heading.className = "xref-section-head";
-  heading.innerHTML =
-    `<span class="xref-section-title">${escapeHtml(title)}</span>` +
-    `<span class="xref-section-count">${groups.length} book${groups.length === 1 ? "" : "s"} · ${total} ref${total === 1 ? "" : "s"}</span>`;
-  section.appendChild(heading);
-
-  if (hint) {
-    const note = document.createElement("p");
-    note.className = "xref-section-hint";
-    note.textContent = hint;
-    section.appendChild(note);
-  }
-
-  groups.slice(0, XREF_VISIBLE_PER_GROUP)
-    .forEach((g) => section.appendChild(buildXrefGroupRow(g, showQuotations)));
-
-  // the tail is mostly books cited once; keep it available but out of the way
-  const rest = groups.slice(XREF_VISIBLE_PER_GROUP);
-  if (rest.length) {
-    const more = document.createElement("div");
-    more.className = "xref-more hidden";
-    rest.forEach((g) => more.appendChild(buildXrefGroupRow(g, showQuotations)));
-    const toggle = document.createElement("button");
-    toggle.className = "xref-more-toggle";
-    toggle.textContent = `Show ${rest.length} more`;
-    toggle.addEventListener("click", () => {
-      const collapsed = more.classList.toggle("hidden");
-      toggle.textContent = collapsed ? `Show ${rest.length} more` : "Show fewer";
-    });
-    section.appendChild(more);
-    section.appendChild(toggle);
-  }
-  return section;
-}
-
 function renderXrefMap() {
-  const sources = (currentData && currentData.cross_reference_sources) || [];
+  const entries = (currentData && currentData.connections) || [];
   els.xrefMapTitle.textContent = currentData ? currentData.reference.display : "";
   els.xrefMapBody.innerHTML = "";
 
-  if (sources.length === 0) {
+  if (entries.length === 0) {
     els.xrefMapSummary.textContent = "";
     els.xrefMapBody.innerHTML = '<p class="muted">No cross-references in this passage.</p>';
     return;
   }
 
-  const total = sources.reduce((n, g) => n + g.count, 0);
-  const quotations = sources.reduce((n, g) => n + g.quotations, 0);
+  const esv = {};
+  (currentData.translations.ESV || []).forEach((v) => { esv[v.id] = v.text; });
+  const all = entries.flatMap((e) => e.links);
+  const quotations = all.filter((l) => l.tier === "quotation").length;
+  const primary = all.filter((l) => l.tier === "primary").length;
+  const weak = all.filter((l) => l.tier === WEAK_TIER);
+
   els.xrefMapSummary.textContent =
-    `${total} references · ${quotations} direct quotation${quotations === 1 ? "" : "s"}`;
+    `${all.length} references across ${entries.length} verses` +
+    (quotations ? ` · ${quotations} quoted directly` : "") +
+    (primary ? ` · ${primary} marked "see"` : "");
 
-  els.xrefMapBody.appendChild(buildXrefRuler());
+  // reading order, because that is how the argument is built
+  inReadingOrder(entries.map((e) => e.verse)).forEach((verseId) => {
+    const entry = entries.find((e) => e.verse === verseId);
+    const visible = entry.links.filter((l) => xrefShowWeak || l.tier !== WEAK_TIER);
+    // a verse whose every link is weak would otherwise render as a bare heading
+    if (visible.length === 0) return;
 
-  // Split rather than rank together. An Old Testament reference inside a New
-  // Testament passage is usually the author reaching for scripture; a New
-  // Testament one is Crossway pointing at a similar passage elsewhere; and a
-  // reference back into this same book is the letter talking about itself.
-  // Ranking all three in one list buries the first under the other two — in
-  // Ephesians 1, forty-four of the top references are Ephesians citing itself.
-  const internal = sources.filter((g) => g.internal);
-  const external = sources.filter((g) => !g.internal);
-  const ownTestament = currentData.reference.book_id
-    && (currentData.cross_reference_sources.find((g) => g.internal) || {}).testament;
+    const block = document.createElement("section");
+    block.className = "xconn-verse";
 
-  [
-    buildXrefSection("Old Testament", ownTestament === "NT"
-      ? "Scripture this passage reaches for." : null,
-      external.filter((g) => g.testament === "OT"), true),
-    buildXrefSection("New Testament", ownTestament === "OT"
-      ? "Where this passage is picked up later." : null,
-      external.filter((g) => g.testament === "NT"), true),
-    buildXrefSection(`Within ${currentData.reference.book_name}`,
-      "The book referring back to itself.", internal, false),
-  ].forEach((section) => { if (section) els.xrefMapBody.appendChild(section); });
+    const head = document.createElement("button");
+    head.className = "xconn-verse-head";
+    head.innerHTML =
+      `<span class="xconn-verse-num">${escapeHtml(verseLabel(verseId))}</span>` +
+      `<span class="xconn-verse-text">${escapeHtml(esv[verseId] || "")}</span>`;
+    head.title = "Go to this verse";
+    head.addEventListener("click", () => jumpToVerse(verseId));
+    block.appendChild(head);
+
+    visible.slice(0, LINKS_PER_VERSE).forEach((link) => block.appendChild(buildXrefLink(link)));
+
+    const rest = visible.slice(LINKS_PER_VERSE);
+    if (rest.length) {
+      const more = document.createElement("div");
+      more.className = "xconn-more hidden";
+      rest.forEach((link) => more.appendChild(buildXrefLink(link)));
+      const moreToggle = document.createElement("button");
+      moreToggle.className = "xconn-more-toggle";
+      moreToggle.textContent = `${rest.length} more`;
+      moreToggle.addEventListener("click", () => {
+        const hidden = more.classList.toggle("hidden");
+        moreToggle.textContent = hidden ? `${rest.length} more` : "fewer";
+      });
+      block.appendChild(more);
+      block.appendChild(moreToggle);
+    }
+    els.xrefMapBody.appendChild(block);
+  });
+
+  if (weak.length) {
+    const toggle = document.createElement("button");
+    toggle.className = "xconn-weak-toggle";
+    toggle.textContent = xrefShowWeak
+      ? "Hide weaker links"
+      : `Show ${weak.length} weaker link${weak.length === 1 ? "" : "s"}`;
+    toggle.addEventListener("click", async () => {
+      // their text is not fetched with the passage — previewing every reference
+      // would mean 177 chapter fetches for Romans 9-11 — so it is filled in on
+      // first reveal and cached onto the link objects
+      if (!xrefShowWeak && weak.some((l) => !l.text)) {
+        const refs = [...new Set(weak.filter((l) => !l.text).map((l) => l.ref))];
+        try {
+          const resp = await fetch(`/api/preview?refs=${encodeURIComponent(refs.join(";"))}`);
+          const texts = await resp.json();
+          weak.forEach((l) => { if (texts[l.ref]) l.text = texts[l.ref]; });
+        } catch {
+          // the reference is still listed and still clickable without its text
+        }
+      }
+      xrefShowWeak = !xrefShowWeak;
+      renderXrefMap();
+    });
+    els.xrefMapBody.appendChild(toggle);
+  }
+
+  const note = document.createElement("p");
+  note.className = "xconn-note";
+  note.textContent =
+    "Crossway's own apparatus, in its own order of strength: quoted, \u201csee\u201d, " +
+    "plain, then bracketed. Quoted text is the Berean Standard Bible.";
+  els.xrefMapBody.appendChild(note);
 }
 
 els.xrefMapOpen.addEventListener("click", openXrefMap);

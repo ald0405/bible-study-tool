@@ -1018,200 +1018,140 @@ mark {
   padding: 0.9rem 1.2rem 2rem;
 }
 
-/* chapter ticks, so a multi-chapter strip can be read against the chapters */
-/* sticky, so the chapter marks stay readable while scrolling forty book rows */
-.xref-ruler {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  height: 1.15rem;
-  margin: 0 0 0.6rem;
-  background: var(--surface);
+/* The passage in reading order: each verse, then what it reaches for, with the
+   words of the passage it points at. This replaced a chart of how heavily each
+   cited book was used and where — at the density of a normal passage that was a
+   column of near-empty bars, and it never showed what any connection said. */
+
+.xconn-verse {
+  margin-bottom: 1.1rem;
+  padding-bottom: 0.9rem;
   border-bottom: 1px solid var(--border);
 }
 
-.xref-tick {
-  position: absolute;
-  transform: translateX(-2px);
-  font-family: var(--mono);
-  font-size: 0.62rem;
-  color: var(--text-muted);
-  border-left: 1px solid var(--border);
-  padding-left: 0.2rem;
-  white-space: nowrap;
+.xconn-verse:last-of-type { border-bottom: none; }
+
+.xconn-verse-head {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  margin-bottom: 0.4rem;
+  border: none;
+  background: none;
+  border-radius: 3px;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--serif);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text);
 }
 
-.xref-section { margin-bottom: 1.4rem; }
+.xconn-verse-head:hover { background: var(--accent-soft); }
 
-.xref-section-head {
+.xconn-verse-num {
+  display: inline-block;
+  min-width: 2.2em;
+  margin-right: 0.4em;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  vertical-align: 1px;
+}
+
+.xconn-link {
+  margin: 0 0 0.5rem 1.6rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--border);
+}
+
+/* a quotation is the strongest claim the apparatus makes, so it reads heaviest;
+   a bracketed link is its weakest and is hidden until asked for */
+.xconn-link[data-tier="quotation"] { border-left-color: var(--accent); }
+.xconn-link[data-tier="primary"] { border-left-color: var(--cat-temporal); }
+.xconn-link[data-tier="weak"] { border-left-style: dotted; }
+
+.xconn-ref {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 0.6rem;
-  margin-bottom: 0.1rem;
-  padding-bottom: 0.2rem;
-  border-bottom: 1px solid var(--border);
+  gap: 0.4rem;
+  padding: 0.1rem 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+  text-align: left;
 }
 
-.xref-section-title {
-  font-size: 0.72rem;
+.xconn-ref:hover .xconn-ref-name { text-decoration: underline; }
+
+.xconn-badge {
+  flex-shrink: 0;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 0.08rem 0.35rem;
 }
 
-.xref-section-count {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--text-muted);
+.xconn-link[data-tier="quotation"] .xconn-badge {
+  color: var(--surface);
+  background: var(--accent);
 }
 
-.xref-section-hint {
-  margin: 0.3rem 0 0.6rem;
-  font-size: 0.75rem;
+.xconn-text {
+  margin: 0.15rem 0 0;
+  font-family: var(--serif);
   font-style: italic;
+  font-size: 0.85rem;
+  line-height: 1.45;
   color: var(--text-muted);
 }
 
-.xref-more-toggle {
-  margin-top: 0.2rem;
-  padding: 0.2rem 0;
+.xconn-more-toggle {
+  margin: 0 0 0 1.6rem;
+  padding: 0.1rem 0;
   border: none;
   background: none;
   font-family: inherit;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--link);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
-.xref-more-toggle:hover { text-decoration: underline; }
+.xconn-more-toggle:hover { color: var(--link); text-decoration: underline; }
 
-.xref-row { margin-bottom: 0.55rem; }
-
-.xref-row-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.6rem;
-  width: 100%;
+.xconn-weak-toggle {
+  margin: 0.2rem 0 0.6rem;
   padding: 0.25rem 0;
   border: none;
   background: none;
   font-family: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--link);
   cursor: pointer;
-  text-align: left;
 }
 
-.xref-row-head::before {
-  content: "";
-  flex-shrink: 0;
-  width: 0;
-  height: 0;
-  border-left: 4px solid var(--text-muted);
-  border-top: 3.5px solid transparent;
-  border-bottom: 3.5px solid transparent;
-  transition: transform 0.15s ease;
-}
+.xconn-weak-toggle:hover { text-decoration: underline; }
 
-.xref-row.expanded .xref-row-head::before { transform: rotate(90deg); }
-
-.xref-book { font-weight: 600; flex: 1; }
-
-.xref-count {
-  flex-shrink: 0;
-  min-width: 1.6em;
-  text-align: right;
-  font-family: var(--mono);
-  font-size: 0.75rem;
+.xconn-note {
+  margin: 0.4rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.74rem;
+  font-style: italic;
+  line-height: 1.45;
   color: var(--text-muted);
 }
-
-.xref-quote-count {
-  flex-shrink: 0;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-radius: 3px;
-  padding: 0.05rem 0.35rem;
-}
-
-/* The strip is purely positional: left to right is the passage, start to end.
-   It carries no fill behind the marks — a bar growing from the left reads as
-   "cited through the first 40% of the passage", which is exactly the thing the
-   marks are already saying and was not what the bar meant. The count in the
-   row heading carries the weight instead. */
-.xref-strip {
-  position: relative;
-  height: 18px;
-  margin-bottom: 0.35rem;
-  border-radius: 2px;
-  background: var(--bg);
-  box-shadow: inset 0 0 0 1px var(--border-faint);
-  cursor: default;
-}
-
-.xref-mark {
-  position: absolute;
-  top: 5px;
-  width: 3px;
-  height: 8px;
-  margin-left: -1.5px;
-  border-radius: 1px;
-  background: var(--cat-neutral);
-  cursor: pointer;
-}
-
-.xref-mark:hover { background: var(--text); height: 14px; top: 2px; }
-
-/* A direct quotation is a far stronger claim than an editorial parallel, so it
-   reads as a different mark rather than a slightly thicker one. */
-.xref-mark-quote {
-  top: 0;
-  width: 4px;
-  height: 18px;
-  margin-left: -2px;
-  background: var(--accent);
-}
-
-.xref-links {
-  margin: 0.2rem 0 0.6rem;
-  padding-left: 0.6rem;
-  border-left: 2px solid var(--border);
-}
-
-.xref-link {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.25rem 0.4rem;
-  border: none;
-  background: none;
-  border-radius: 3px;
-  font-family: inherit;
-  font-size: 0.82rem;
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.xref-link:hover { background: var(--accent-soft); }
-
-.xref-link-from {
-  flex-shrink: 0;
-  min-width: 3.2em;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-.xref-link-to { flex: 1; color: var(--link); font-weight: 600; }
 
 @media (max-width: 900px) {
   .xref-map { width: 100vw; }
