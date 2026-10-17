@@ -1,0 +1,713 @@
+<title>Bible Study Tool Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+
+<style>
+  /* ============================================================
+     TOKENS — carried over verbatim from static/style.css, plus
+     the new radius / shadow / selected-state tokens this page
+     proposes. Nothing below renames or recolors an existing
+     token; it only fills the gaps (radius, shadow, state) that
+     the running app currently hardcodes ad hoc.
+     ============================================================ */
+  :root {
+    /* — existing, from static/style.css :root (lines 1–32) — */
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #dcdcd8;
+    --border-faint: #efefec;
+    --text: #1c1d1f;
+    --text-muted: #6b6d70;
+    --accent: #2b3a55;
+    --accent-soft: #eef1f6;
+    --verse-badge-bg: #ececea;
+    --verse-badge-text: #45474a;
+    --mark-bg: #ffe08a;
+    --link: #2b3a55;
+    --woc-red: #a83232;
+    --sentiment-pos: #2f7a4d;
+    --sentiment-pos-bg: #e0f2e6;
+    --sentiment-neg: #c25b2e;
+    --sentiment-neg-bg: #fbe8dc;
+    --cat-logical: #2b3a55;
+    --cat-logical-bg: #e8ebf1;
+    --cat-contrastive: #a8703f;
+    --cat-contrastive-bg: #f3e9dc;
+    --cat-temporal: #3f6e82;
+    --cat-temporal-bg: #e3edf1;
+    --cat-focus: #7d5a83;
+    --cat-focus-bg: #f0e7f0;
+    --cat-neutral: #8a8c90;
+    --cat-neutral-bg: #ececea;
+    --serif: "Source Serif 4", "Georgia", "Times New Roman", serif;
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", "SF Mono", "Menlo", monospace;
+
+    /* — new: radius scale — */
+    --r-sm: 6px;
+    --r-md: 9px;
+    --r-lg: 14px;
+    --r-pill: 999px;
+
+    /* — new: shadow scale, derived from --text so shadows stay in
+       this app's own warm/neutral family rather than a generic
+       black — */
+    --shadow-sm: 0 1px 2px rgba(28, 29, 31, .05), 0 3px 10px rgba(28, 29, 31, .06);
+    --shadow-md: 0 4px 20px rgba(28, 29, 31, .10);
+    --shadow-drawer: -6px 0 24px rgba(0, 0, 0, .08); /* existing value from #xref-map, named */
+
+    /* — new: selected-state pair, generalised from the one
+       existing rule that already got this right (.glossary-entry.active) — */
+    --state-selected-bg: var(--accent-soft);
+    --state-selected-ring: inset 0 0 0 1px var(--accent);
+  }
+
+  /* This page documents a light-only app (no dark mode exists in
+     static/style.css) — staying single-theme here is a deliberate
+     match to the system being documented, not an oversight. Every
+     color below still resolves from a token, and body paints an
+     explicit background. */
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  img { max-width: 100%; }
+  ::selection { background: var(--accent-soft); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  a { color: var(--link); }
+
+  code, .mono { font-family: var(--mono); }
+
+  /* ---------------------------------------------------------------
+     Page chrome — a specimen-sheet layout. Each section carries a
+     margin number styled exactly like the app's own verse badge
+     (same bg/text tokens, same radius-less mono numeral) — the
+     documentation borrows the one visual habit every reader of
+     this app already recognises: a small mono tag marking position.
+     --------------------------------------------------------------- */
+  .page { max-width: 1120px; margin: 0 auto; padding: 4rem 2rem 6rem; }
+
+  .masthead { max-width: 640px; margin-bottom: 1rem; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 .9rem;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 2.6rem;
+    line-height: 1.1;
+    margin: 0 0 .15rem;
+    text-wrap: balance;
+    color: var(--text);
+  }
+  .h1-sub {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.3rem;
+    color: var(--text-muted);
+    margin: 0 0 1.1rem;
+  }
+  .lede { max-width: 62ch; color: var(--text-muted); font-size: 0.97rem; }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  .scope-note {
+    margin-top: 1.6rem;
+    max-width: 62ch;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r-sm);
+    padding: .85rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  .scope-note b { color: var(--text); }
+
+  section.spec {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 1.75rem;
+    margin-top: 4.5rem;
+    padding-top: 2.5rem;
+    border-top: 1px solid var(--border-faint);
+  }
+  @media (max-width: 760px) {
+    section.spec { grid-template-columns: 1fr; gap: .9rem; }
+  }
+
+  .spec-label { position: relative; }
+  .spec-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4em;
+    height: 1.4em;
+    padding: 0 .35em;
+    border-radius: 3px; /* matches the app's current .verse-badge radius, kept as-is */
+    background: var(--verse-badge-bg);
+    color: var(--verse-badge-text);
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 0.78rem;
+  }
+  .spec-title {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin: .6rem 0 0;
+    color: var(--text);
+  }
+  .spec-sub { font-size: 0.8rem; color: var(--text-muted); margin: .25rem 0 0; max-width: 20ch; }
+
+  .spec-body > .intro { max-width: 62ch; color: var(--text-muted); font-size: 0.9rem; margin: 0 0 1.4rem; }
+  .spec-body > .intro strong { color: var(--text); }
+
+  /* tags: "new" vs "existing" token provenance — reusing the app's
+     own sentiment / category token pairs, not inventing new colors */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: .18rem .55rem;
+    border-radius: var(--r-pill);
+  }
+  .tag-new { background: var(--sentiment-pos-bg); color: var(--sentiment-pos); }
+  .tag-existing { background: var(--cat-neutral-bg); color: var(--cat-neutral); }
+
+  /* ---------------------------------------------------------------
+     Color swatches
+     --------------------------------------------------------------- */
+  .swatch-group { margin-bottom: 1.8rem; }
+  .swatch-group:last-child { margin-bottom: 0; }
+  .swatch-group h3 {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 .7rem;
+  }
+  .swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .7rem; }
+  .swatch {
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .swatch .chip { height: 44px; }
+  .swatch .meta { padding: .5rem .6rem .6rem; }
+  .swatch .name { font-family: var(--mono); font-size: 0.72rem; font-weight: 600; color: var(--text); display: block; }
+  .swatch .hex { font-family: var(--mono); font-size: 0.68rem; color: var(--text-muted); }
+  .swatch .usage { font-size: 0.72rem; color: var(--text-muted); margin-top: .2rem; }
+
+  /* ---------------------------------------------------------------
+     Type specimen
+     --------------------------------------------------------------- */
+  .type-row { display: grid; grid-template-columns: 110px 1fr; gap: 1rem; align-items: baseline; padding: .9rem 0; border-bottom: 1px solid var(--border-faint); }
+  .type-row:last-child { border-bottom: none; }
+  .type-tag { font-family: var(--mono); font-size: 0.68rem; color: var(--text-muted); }
+  .type-sample-serif { font-family: var(--serif); font-size: 1.7rem; font-weight: 600; }
+  .type-sample-sans { font-family: var(--sans); font-size: 1rem; font-weight: 500; }
+  .type-sample-mono { font-family: var(--mono); font-size: 0.95rem; font-weight: 500; color: var(--accent); }
+  @media (max-width: 600px) { .type-row { grid-template-columns: 1fr; gap: .2rem; } }
+
+  /* ---------------------------------------------------------------
+     Radius / shadow scale
+     --------------------------------------------------------------- */
+  .scale-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+  .scale-card { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 1rem; background: var(--surface); }
+  .scale-demo {
+    height: 56px;
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    margin-bottom: .8rem;
+  }
+  .scale-card .name { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; color: var(--text); }
+  .scale-card .value { font-family: var(--mono); font-size: 0.72rem; color: var(--text-muted); display: block; margin: .15rem 0 .5rem; }
+  .scale-card .usage { font-size: 0.78rem; color: var(--text-muted); }
+
+  .shadow-demo { height: 56px; background: var(--surface); border-radius: var(--r-md); margin-bottom: .8rem; }
+  .shadow-drawer-demo {
+    height: 56px;
+    width: 70%;
+    margin-left: auto;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    margin-bottom: .8rem;
+  }
+
+  /* ---------------------------------------------------------------
+     Selected-state pattern
+     --------------------------------------------------------------- */
+  .state-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .state-row {
+    display: flex; align-items: center; gap: .6rem;
+    padding: .55rem .7rem; border-radius: var(--r-sm);
+    font-size: 0.88rem; color: var(--text);
+    border: 1px solid var(--border-faint);
+  }
+  .state-row .dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+  .state-row.is-selected {
+    background: var(--state-selected-bg);
+    box-shadow: var(--state-selected-ring);
+    border-color: transparent;
+  }
+  .state-row.is-selected .dot { background: var(--accent); }
+  .state-caption { font-size: 0.72rem; color: var(--text-muted); margin-top: .5rem; }
+
+  /* ---------------------------------------------------------------
+     Component comparisons — "current" vs "proposed" (vs "pill")
+     --------------------------------------------------------------- */
+  .compare { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+  .compare.compare-3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 800px) { .compare, .compare.compare-3 { grid-template-columns: 1fr; } }
+
+  .frame { border: 1px solid var(--border-faint); border-radius: var(--r-sm); overflow: hidden; }
+  .frame-tag {
+    font-family: var(--mono); font-size: 0.68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    padding: .5rem .8rem; color: var(--text-muted); background: var(--surface); border-bottom: 1px solid var(--border-faint);
+  }
+  .frame-tag.is-proposed { color: var(--sentiment-pos); }
+  .frame-body { padding: 1.4rem; background: var(--bg); min-height: 92px; display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+
+  /* -- replica: search form (mirrors #search-form / #search-input / .example in static/style.css) -- */
+  .replica-search { display: flex; gap: .5rem; width: 100%; }
+  .replica-input {
+    flex: 1; padding: .55rem .8rem; border: 1px solid var(--border);
+    font-size: 0.95rem; font-family: var(--sans); background: var(--surface); color: var(--text-muted);
+  }
+  .replica-btn {
+    padding: .55rem 1rem; border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    font-size: 0.9rem; font-family: var(--sans); cursor: pointer;
+  }
+  .frame-current .replica-input,
+  .frame-current .replica-btn,
+  .frame-current .replica-example { border-radius: 3px; }
+
+  .frame-proposed .replica-input,
+  .frame-proposed .replica-btn,
+  .frame-proposed .replica-example { border-radius: var(--r-md); transition: filter .15s, box-shadow .15s; }
+  .frame-proposed .replica-btn { box-shadow: var(--shadow-sm); }
+  .frame-proposed .replica-btn:hover { filter: brightness(1.08); box-shadow: var(--shadow-md); }
+
+  .frame-pill .replica-input,
+  .frame-pill .replica-btn,
+  .frame-pill .replica-example { border-radius: var(--r-pill); }
+  .frame-pill .replica-btn { box-shadow: var(--shadow-sm); }
+
+  .replica-example {
+    padding: .25rem .6rem; font-size: 0.82rem; border: 1px solid var(--accent); background: var(--surface); color: var(--accent);
+    font-family: var(--sans); cursor: pointer;
+  }
+
+  /* -- replica: sidebar panel (mirrors .panel / .panel-hint / .xref-map-open) -- */
+  .replica-panel { background: var(--surface); border: 1px solid var(--border); padding: 1rem 1.1rem; width: 100%; }
+  .frame-current .replica-panel { border-radius: 4px; }
+  .frame-proposed .replica-panel { border-radius: var(--r-lg); box-shadow: var(--shadow-sm); }
+  .replica-panel-title { font-weight: 700; color: var(--accent); margin: 0 0 .3rem; font-size: 1rem; display: flex; align-items: center; gap: .4rem; }
+  .replica-panel-count { font-weight: 400; font-size: 0.78rem; color: var(--text-muted); }
+  .replica-panel-hint { margin: 0 0 .7rem; font-size: 0.8rem; color: var(--text-muted); }
+  .replica-xref-btn {
+    display: inline-block; padding: .4rem .7rem; border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); font-size: 0.82rem; font-family: var(--sans); cursor: pointer; margin-bottom: .6rem;
+  }
+  .frame-current .replica-xref-btn { border-radius: 3px; }
+  .frame-proposed .replica-xref-btn { border-radius: var(--r-md); }
+  .replica-muted { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+  /* -- replica: list rows (verse cell / discourse item / summary row) -- */
+  .replica-row { width: 100%; padding: .55rem .6rem; font-size: 0.88rem; color: var(--text); margin-bottom: .3rem; }
+  .frame-current .replica-row { border-radius: 4px; }
+  .frame-proposed .replica-row { border-radius: var(--r-sm); }
+  .replica-row.is-selected.frame-state-current { background: var(--accent-soft); }
+  .replica-row.is-selected.frame-state-proposed { background: var(--state-selected-bg); box-shadow: var(--state-selected-ring); }
+  .replica-row .r-top { display: flex; justify-content: space-between; gap: .5rem; }
+  .replica-row .r-marker { font-weight: 700; color: var(--accent); }
+  .replica-row .r-sub { color: var(--text-muted); font-size: 0.78rem; }
+  .replica-verse-badge {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 1.4em; height: 1.4em;
+    padding: 0 .35em; margin-right: .4em; border-radius: 3px; background: var(--verse-badge-bg);
+    color: var(--verse-badge-text); font-family: var(--mono); font-weight: 500; font-size: 0.8rem;
+  }
+  .replica-verse-text { font-family: var(--serif); }
+
+  /* -- open-decision block -- */
+  .decision-block {
+    margin-top: 4.5rem; padding: 2rem; background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--sentiment-neg); border-radius: var(--r-sm);
+  }
+  .decision-block h2 { font-family: var(--serif); font-size: 1.4rem; margin: 0 0 .4rem; }
+  .decision-block .lede { margin-bottom: 1.6rem; }
+  .decision-caption { text-align: center; font-family: var(--mono); font-size: 0.72rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin-top: .6rem; }
+
+  footer.page-footer {
+    margin-top: 5rem; padding-top: 2rem; border-top: 1px solid var(--border-faint);
+    font-size: 0.85rem; color: var(--text-muted); max-width: 62ch;
+  }
+  footer.page-footer b { color: var(--text); }
+</style>
+
+<div class="page">
+
+  <div class="masthead">
+    <p class="eyebrow">Design System — Step 1 of 2 — Reference Only</p>
+    <h1>Bible Study Tool</h1>
+    <p class="h1-sub">Design System</p>
+    <p class="lede">
+      The app already has a deliberate color and type system — a navy accent, a warm
+      neutral background, Source&nbsp;Serif&nbsp;4 for reading, IBM&nbsp;Plex&nbsp;Sans/Mono for
+      interface and data. What it's missing is a formal scale for <strong>radius</strong>,
+      <strong>shadow</strong>, and <strong>selected-state</strong> styling — every box, button
+      and badge currently hardcodes its own one-off value. This page proposes the missing
+      scale, documents the full token set, and shows it applied to the three places that
+      currently read as flat or ambiguous: the search button, the sidebar panels, and
+      "selected" feedback across verses, discourse markers and cross-references.
+    </p>
+    <div class="scope-note">
+      <b>Scope:</b> this is a reference artifact only. No file under <code>static/</code> has
+      been touched — <code>style.css</code>, <code>index.html</code> and <code>app.js</code>
+      are exactly as they were. Rolling an approved direction into the real app is a
+      separate next step, once this has been reviewed.
+    </div>
+  </div>
+
+  <!-- 01 — COLOR -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">01</span>
+      <p class="spec-title">Color</p>
+      <p class="spec-sub">All existing — nothing new</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro"><strong>Every value below already exists</strong> in <code>static/style.css</code>'s <code>:root</code> block. Nothing here is a new brand color — only the grouping is new, to make the system legible as a system rather than a flat list of 25 variables.</p>
+
+      <div class="swatch-group">
+        <h3>Surface &amp; neutrals</h3>
+        <div class="swatch-grid">
+          <div class="swatch"><div class="chip" style="background:var(--bg)"></div><div class="meta"><span class="name">--bg</span><span class="hex">#f7f7f5</span><div class="usage">Page background</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--surface);border-bottom:1px solid var(--border-faint)"></div><div class="meta"><span class="name">--surface</span><span class="hex">#ffffff</span><div class="usage">Cards, panels, inputs</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--border)"></div><div class="meta"><span class="name">--border</span><span class="hex">#dcdcd8</span><div class="usage">Hairline rules, box edges</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--border-faint)"></div><div class="meta"><span class="name">--border-faint</span><span class="hex">#efefec</span><div class="usage">Quiet dividers (paragraph ends)</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--text)"></div><div class="meta"><span class="name">--text</span><span class="hex">#1c1d1f</span><div class="usage">Body ink</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--text-muted)"></div><div class="meta"><span class="name">--text-muted</span><span class="hex">#6b6d70</span><div class="usage">Captions, hints</div></div></div>
+        </div>
+      </div>
+
+      <div class="swatch-group">
+        <h3>Accent &amp; links</h3>
+        <div class="swatch-grid">
+          <div class="swatch"><div class="chip" style="background:var(--accent)"></div><div class="meta"><span class="name">--accent</span><span class="hex">#2b3a55</span><div class="usage">Buttons, selected rings, panel titles</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--accent-soft)"></div><div class="meta"><span class="name">--accent-soft</span><span class="hex">#eef1f6</span><div class="usage">Hover &amp; selected fills</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--link)"></div><div class="meta"><span class="name">--link</span><span class="hex">#2b3a55</span><div class="usage">Cross-ref links — same hex as --accent, kept as its own token</div></div></div>
+        </div>
+      </div>
+
+      <div class="swatch-group">
+        <h3>Sentiment (Tone panel)</h3>
+        <div class="swatch-grid">
+          <div class="swatch"><div class="chip" style="background:var(--sentiment-pos)"></div><div class="meta"><span class="name">--sentiment-pos</span><span class="hex">#2f7a4d</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--sentiment-pos-bg)"></div><div class="meta"><span class="name">--sentiment-pos-bg</span><span class="hex">#e0f2e6</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--sentiment-neg)"></div><div class="meta"><span class="name">--sentiment-neg</span><span class="hex">#c25b2e</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--sentiment-neg-bg)"></div><div class="meta"><span class="name">--sentiment-neg-bg</span><span class="hex">#fbe8dc</span></div></div>
+        </div>
+      </div>
+
+      <div class="swatch-group">
+        <h3>Category tags (Who Acts / discourse)</h3>
+        <div class="swatch-grid">
+          <div class="swatch"><div class="chip" style="background:var(--cat-logical)"></div><div class="meta"><span class="name">--cat-logical</span><span class="hex">#2b3a55</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--cat-contrastive)"></div><div class="meta"><span class="name">--cat-contrastive</span><span class="hex">#a8703f</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--cat-temporal)"></div><div class="meta"><span class="name">--cat-temporal</span><span class="hex">#3f6e82</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--cat-focus)"></div><div class="meta"><span class="name">--cat-focus</span><span class="hex">#7d5a83</span></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--cat-neutral)"></div><div class="meta"><span class="name">--cat-neutral</span><span class="hex">#8a8c90</span></div></div>
+        </div>
+      </div>
+
+      <div class="swatch-group">
+        <h3>Special-purpose</h3>
+        <div class="swatch-grid">
+          <div class="swatch"><div class="chip" style="background:var(--mark-bg)"></div><div class="meta"><span class="name">--mark-bg</span><span class="hex">#ffe08a</span><div class="usage">Inline highlight &lt;mark&gt;</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--woc-red)"></div><div class="meta"><span class="name">--woc-red</span><span class="hex">#a83232</span><div class="usage">Words of Christ</div></div></div>
+          <div class="swatch"><div class="chip" style="background:var(--verse-badge-bg)"></div><div class="meta"><span class="name">--verse-badge-bg</span><span class="hex">#ececea</span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 — TYPE -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">02</span>
+      <p class="spec-title">Type</p>
+      <p class="spec-sub">All existing — no new scale</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">The three families already carry three distinct jobs. No new typeface or scale is proposed — just shown here for completeness.</p>
+      <div class="type-row">
+        <span class="type-tag">--serif</span>
+        <div><div class="type-sample-serif">Ephesians 1</div><div class="type-sample-mono" style="color:var(--text-muted);font-size:.78rem;margin-top:.3rem">Source Serif 4 — passage titles &amp; verse text</div></div>
+      </div>
+      <div class="type-row">
+        <span class="type-tag">--sans</span>
+        <div><div class="type-sample-sans">Search a passage, e.g. Eph 1:1&ndash;14</div><div class="type-sample-mono" style="color:var(--text-muted);font-size:.78rem;margin-top:.3rem">IBM Plex Sans — interface copy, panel hints</div></div>
+      </div>
+      <div class="type-row">
+        <span class="type-tag">--mono</span>
+        <div><div class="type-sample-mono">16 &nbsp;&middot;&nbsp; --state-selected-ring</div><div class="type-sample-mono" style="color:var(--text-muted);font-size:.78rem;margin-top:.3rem">IBM Plex Mono — verse badges, token names</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 — RADIUS -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">03</span>
+      <p class="spec-title">Radius <span class="tag tag-new">new</span></p>
+      <p class="spec-sub">Replaces the current 2–5px one-offs</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">Today <code>border-radius</code> is set independently on every rule — 2px, 3px, 4px, 5px, scattered with no relationship to each other. This is the proposed scale that replaces all of them.</p>
+      <div class="scale-grid">
+        <div class="scale-card">
+          <div class="scale-demo" style="border-radius:var(--r-sm)"></div>
+          <span class="name">--r-sm</span><span class="value">6px</span>
+          <p class="usage">Badges &amp; small chips — verse badge, quote badge, bar tracks</p>
+        </div>
+        <div class="scale-card">
+          <div class="scale-demo" style="border-radius:var(--r-md)"></div>
+          <span class="name">--r-md</span><span class="value">9px</span>
+          <p class="usage">Buttons &amp; inputs — search bar, example chips</p>
+        </div>
+        <div class="scale-card">
+          <div class="scale-demo" style="border-radius:var(--r-lg)"></div>
+          <span class="name">--r-lg</span><span class="value">14px</span>
+          <p class="usage">Cards &amp; panels — sidebar boxes, reading grid wrap, minimap</p>
+        </div>
+        <div class="scale-card">
+          <div class="scale-demo" style="border-radius:var(--r-pill)"></div>
+          <span class="name">--r-pill</span><span class="value">999px</span>
+          <p class="usage">Fully-rounded tags, kept distinct from --r-sm so "pill" is a deliberate choice, not a side effect</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — SHADOW -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">04</span>
+      <p class="spec-title">Shadow <span class="tag tag-new">new</span></p>
+      <p class="spec-sub">The app currently has none</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">Zero panels or buttons currently cast a shadow. These two are soft and derived from <code>--text</code> (the app's own ink color) rather than a generic black, so they stay inside the existing warm/neutral palette.</p>
+      <div class="scale-grid">
+        <div class="scale-card">
+          <div class="shadow-demo" style="box-shadow:var(--shadow-sm)"></div>
+          <span class="name">--shadow-sm</span>
+          <p class="usage">Resting elevation — panels, buttons</p>
+        </div>
+        <div class="scale-card">
+          <div class="shadow-demo" style="box-shadow:var(--shadow-md)"></div>
+          <span class="name">--shadow-md</span>
+          <p class="usage">Hover / elevated state</p>
+        </div>
+        <div class="scale-card">
+          <div class="shadow-drawer-demo" style="box-shadow:var(--shadow-drawer)"></div>
+          <span class="name">--shadow-drawer</span>
+          <p class="usage">Directional only — the cross-ref drawer's existing cast, named but not folded into the general scale</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 — SELECTED STATE -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">05</span>
+      <p class="spec-title">Selected state <span class="tag tag-new">new</span></p>
+      <p class="spec-sub">One pattern, used everywhere</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">
+        Right now three different mechanisms each render "selected" differently — a plain
+        background tint on verse cells, an untokenized hex on term rows, the yellow highlight
+        color reused on Who Acts lemmas — and most list rows (discourse markers, cross-refs,
+        summary rows) have no selected state at all, only hover. The one place this already
+        works well is <code>.glossary-entry.active</code>: a background tint plus an inset
+        ring. This generalizes that into two shared tokens, applied consistently everywhere.
+      </p>
+      <div class="state-pair">
+        <div>
+          <div class="state-row"><span class="dot"></span> Ephesians 1:3</div>
+          <div class="state-caption">Unselected — default row</div>
+        </div>
+        <div>
+          <div class="state-row is-selected"><span class="dot"></span> Ephesians 1:3</div>
+          <div class="state-caption">Selected — <code>--state-selected-bg</code> + <code>--state-selected-ring</code></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 — SEARCH BAR -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">06</span>
+      <p class="spec-title">Search bar</p>
+      <p class="spec-sub">The flagged button</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">Real markup from <code>#search-form</code>. Current: flat <code>3px</code> radius, no hover transition, no visible focus state on the button itself.</p>
+      <div class="compare">
+        <div class="frame frame-current">
+          <div class="frame-tag">Current — 3px</div>
+          <div class="frame-body">
+            <form class="replica-search">
+              <input class="replica-input" value="Ephesians 1" readonly>
+              <button class="replica-btn" type="button">Search Passage</button>
+            </form>
+          </div>
+        </div>
+        <div class="frame frame-proposed">
+          <div class="frame-tag is-proposed">Proposed — --r-md, 9px</div>
+          <div class="frame-body">
+            <form class="replica-search">
+              <input class="replica-input" value="Ephesians 1" readonly>
+              <button class="replica-btn" type="button">Search Passage</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 — SIDEBAR PANEL -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">07</span>
+      <p class="spec-title">Sidebar panel</p>
+      <p class="spec-sub">"The boxes on the right"</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">The real Cross References panel, copy unchanged. Current: flat <code>4px</code>, hairline border, no shadow. Proposed: <code>--r-lg</code> + <code>--shadow-sm</code>.</p>
+      <div class="compare">
+        <div class="frame frame-current">
+          <div class="frame-tag">Current — 4px, no shadow</div>
+          <div class="frame-body" style="align-items:flex-start">
+            <div class="replica-panel">
+              <p class="replica-panel-title">Cross References <span class="replica-panel-count">12</span></p>
+              <p class="replica-panel-hint">Click a verse to see related passages, from the ESV's own official cross-reference apparatus. Entries badged &ldquo;Quotation&rdquo; are direct quotations.</p>
+              <button class="replica-xref-btn" type="button">Map the whole passage &rarr;</button>
+              <p class="replica-muted">No verse selected.</p>
+            </div>
+          </div>
+        </div>
+        <div class="frame frame-proposed">
+          <div class="frame-tag is-proposed">Proposed — --r-lg, --shadow-sm</div>
+          <div class="frame-body" style="align-items:flex-start">
+            <div class="replica-panel">
+              <p class="replica-panel-title">Cross References <span class="replica-panel-count">12</span></p>
+              <p class="replica-panel-hint">Click a verse to see related passages, from the ESV's own official cross-reference apparatus. Entries badged &ldquo;Quotation&rdquo; are direct quotations.</p>
+              <button class="replica-xref-btn" type="button">Map the whole passage &rarr;</button>
+              <p class="replica-muted">No verse selected.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 — SELECTED VS UNSELECTED ROWS -->
+  <section class="spec">
+    <div class="spec-label">
+      <span class="spec-num">08</span>
+      <p class="spec-title">List rows</p>
+      <p class="spec-sub">Selected vs. unselected, three row types</p>
+    </div>
+    <div class="spec-body">
+      <p class="intro">Same three row types as they exist in the app today — a verse cell, a discourse-marker row, a cross-reference row — each shown unselected and selected, current treatment vs. proposed.</p>
+
+      <div class="compare" style="margin-bottom:1.25rem">
+        <div class="frame frame-current">
+          <div class="frame-tag">Current</div>
+          <div class="frame-body" style="flex-direction:column;align-items:stretch;gap:.3rem">
+            <div class="replica-row frame-state-current"><span class="replica-verse-badge">3</span><span class="replica-verse-text">Verse text renders here in the serif reading face.</span></div>
+            <div class="replica-row frame-state-current is-selected"><span class="replica-verse-badge">4</span><span class="replica-verse-text">Verse text renders here in the serif reading face.</span></div>
+            <div class="replica-row frame-state-current"><div class="r-top"><span class="r-marker">Therefore</span><span class="r-sub">Eph 4:1</span></div></div>
+            <div class="replica-row frame-state-current"><div class="r-top"><span>Eph 1:3 preview</span><span class="r-sub">parallel</span></div></div>
+          </div>
+        </div>
+        <div class="frame frame-proposed">
+          <div class="frame-tag is-proposed">Proposed</div>
+          <div class="frame-body" style="flex-direction:column;align-items:stretch;gap:.3rem">
+            <div class="replica-row frame-state-proposed"><span class="replica-verse-badge">3</span><span class="replica-verse-text">Verse text renders here in the serif reading face.</span></div>
+            <div class="replica-row frame-state-proposed is-selected"><span class="replica-verse-badge">4</span><span class="replica-verse-text">Verse text renders here in the serif reading face.</span></div>
+            <div class="replica-row frame-state-proposed is-selected"><div class="r-top"><span class="r-marker">Therefore</span><span class="r-sub">Eph 4:1</span></div></div>
+            <div class="replica-row frame-state-proposed"><div class="r-top"><span>Eph 1:3 preview</span><span class="r-sub">parallel</span></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="state-caption">Row 2 and row 3 are marked selected in each column — note the current column gives verse cells a faint tint and discourse rows nothing at all; the proposed column gives every row type the same bg + ring.</p>
+    </div>
+  </section>
+
+  <!-- 09 — OPEN DECISION -->
+  <div class="decision-block">
+    <p class="eyebrow" style="margin-bottom:.6rem">09 &middot; Open decision</p>
+    <h2>How rounded should buttons and inputs be?</h2>
+    <p class="lede">
+      The reference you pointed to (your own "Nadia UI Kit") uses fully pill-shaped,
+      <code>999px</code> buttons. This document instead proposed a moderate <code>--r-md</code>
+      (9px) for buttons and inputs — closer to this app's scholarly, text-dense character
+      than a fully pill-shaped control. Rather than settle that by description, here are
+      all three, live, on the real search button. Pick one and the rest of this system
+      follows.
+    </p>
+    <div class="compare compare-3">
+      <div class="frame frame-current">
+        <div class="frame-tag">Current — 3px</div>
+        <div class="frame-body"><button class="replica-btn" type="button">Search Passage</button></div>
+      </div>
+      <div class="frame frame-proposed">
+        <div class="frame-tag is-proposed">Proposed — 9px</div>
+        <div class="frame-body"><button class="replica-btn" type="button">Search Passage</button></div>
+      </div>
+      <div class="frame frame-pill">
+        <div class="frame-tag">Pill — 999px</div>
+        <div class="frame-body"><button class="replica-btn" type="button">Search Passage</button></div>
+      </div>
+    </div>
+    <p class="decision-caption">Pick a direction — then Step 2 implements it in static/style.css</p>
+  </div>
+
+  <footer class="page-footer">
+    <p><b>Next step — not started:</b> once a direction is picked here (especially the radius decision in §09), the tokens above get added to <code>static/style.css</code>'s <code>:root</code> block, and the selectors referenced throughout this page — <code>#search-form button</code>, <code>.panel</code>, <code>.verse-cell.selected</code>, <code>.discourse-item</code>, <code>.crossref-item</code>, <code>.summary-section</code>, <code>.xconn-ref</code> — get updated to use them. That work is scoped separately and hasn't begun.</p>
+  </footer>
+
+</div>

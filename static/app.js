@@ -28,6 +28,7 @@ const els = {
   xrefMapBody: document.getElementById("xref-map-body"),
   xrefMapOpen: document.getElementById("xref-map-open"),
   xrefMapClose: document.getElementById("xref-map-close"),
+  themeToggle: document.getElementById("theme-toggle"),
 };
 
 // one colour per discourse-marker category, shared by the minimap, the
@@ -64,6 +65,43 @@ function loadActiveColumns() {
 
 function saveActiveColumns() {
   localStorage.setItem("activeColumns", JSON.stringify([...activeColumns]));
+}
+
+// Theme defaults to the OS preference (handled in style.css via
+// prefers-color-scheme) until the user picks one explicitly, at which point
+// that choice is stored and wins over the OS setting from then on.
+const THEME_KEY = "theme";
+
+function effectiveTheme() {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyStoredTheme() {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === "light" || stored === "dark") {
+    document.documentElement.setAttribute("data-theme", stored);
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+}
+
+function updateThemeToggleLabel() {
+  const dark = effectiveTheme() === "dark";
+  els.themeToggle.textContent = dark ? "Light mode" : "Dark mode";
+  els.themeToggle.setAttribute("aria-pressed", String(dark));
+}
+
+function initThemeToggle() {
+  applyStoredTheme();
+  updateThemeToggleLabel();
+  els.themeToggle.addEventListener("click", () => {
+    const next = effectiveTheme() === "dark" ? "light" : "dark";
+    localStorage.setItem(THEME_KEY, next);
+    applyStoredTheme();
+    updateThemeToggleLabel();
+  });
 }
 
 let activeColumns = loadActiveColumns();
@@ -646,6 +684,15 @@ function renderGrid(data) {
   });
 }
 
+// Marks el as the only ".selected" match for selector within the document —
+// used by sidebar rows (discourse markers, cross-references, summary
+// sections) that have no other concept of "currently selected" so the row
+// you last acted on stays visibly marked while its panel stays open.
+function selectOnly(selector, el) {
+  document.querySelectorAll(selector).forEach((n) => n.classList.remove("selected"));
+  el.classList.add("selected");
+}
+
 function selectVerse(id) {
   document.querySelectorAll(".verse-cell.selected").forEach((el) => el.classList.remove("selected"));
   document.querySelectorAll(`.verse-cell[data-verse="${id}"]`).forEach((el) => el.classList.add("selected"));
@@ -675,6 +722,7 @@ function renderCrossrefs(id) {
       ${r.preview ? `<div class="cr-preview">“${escapeHtml(r.preview)}” <span class="cr-source">— BSB</span></div>` : ""}
     `;
     btn.addEventListener("click", () => {
+      selectOnly(".crossref-item", btn);
       if (r.refs[0]) loadPassage(r.refs[0], { context: true });
     });
     els.crossrefList.appendChild(btn);
@@ -834,6 +882,7 @@ function renderSections() {
       ? `<span class="d-marker">${swatch}${escapeHtml(section.opener.marker.toLowerCase())} <span class="muted">(${escapeHtml(section.opener.category)})</span></span><span class="d-verse">${label}</span>`
       : `<span class="d-marker">${swatch}Opening</span><span class="d-verse">${label}</span>`;
     btn.addEventListener("click", () => {
+      selectOnly(".discourse-item", btn);
       selectVerse(section.start);
       const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${section.start}"]`);
       if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -898,6 +947,7 @@ function renderDiscourseMarkers(data) {
       btn.className = "discourse-item";
       btn.innerHTML = `<span class="d-marker">${escapeHtml(group.marker)}</span><span class="d-verse">${formatVerseList(verses)}</span>`;
       btn.addEventListener("click", () => {
+        selectOnly(".discourse-item", btn);
         selectVerse(verses[0]);
         const cell = document.querySelector(`.verse-cell[data-col="ESV"][data-verse="${verses[0]}"]`);
         if (cell) cell.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1068,7 +1118,7 @@ function applyHighlightRegex(regex, verseIdList) {
 // at once (on top of the always-on discourse-marker highlighting).
 function setActiveHighlight(rowEl, regex, verseIdList) {
   const wasActive = rowEl.classList.contains("active");
-  document.querySelectorAll(".term-row.active, .glossary-entry.active, .agency-lemma.active").forEach((r) => r.classList.remove("active"));
+  document.querySelectorAll(".term-row.active, .glossary-entry.active, .agency-lemma.active, .summary-theme.active, .summary-reference.active").forEach((r) => r.classList.remove("active"));
   clearTermHighlight();
   if (!wasActive) {
     rowEl.classList.add("active");
@@ -1257,7 +1307,10 @@ function renderSummaryContent(summary) {
       btn.innerHTML =
         `<span class="s-head"><span class="s-title">${escapeHtml(s.title)}</span><span class="d-verse">${formatRange(start, end)}</span></span>` +
         `<span class="s-line">${escapeHtml(s.line || "")}</span>`;
-      btn.addEventListener("click", () => jumpToVerse(start));
+      btn.addEventListener("click", () => {
+        selectOnly(".summary-section", btn);
+        jumpToVerse(start);
+      });
       block.appendChild(btn);
     });
     els.summaryContent.appendChild(block);
@@ -1361,6 +1414,7 @@ function buildXrefLink(link) {
   head.innerHTML = `${badge}<span class="xconn-ref-name">${escapeHtml(link.ref)}</span>`;
   head.title = link.title;
   head.addEventListener("click", () => {
+    selectOnly(".xconn-ref", head);
     closeXrefMap();
     loadPassage(link.ref, { context: true });
   });
@@ -1414,7 +1468,10 @@ function renderXrefMap() {
       `<span class="xconn-verse-num">${escapeHtml(verseLabel(verseId))}</span>` +
       `<span class="xconn-verse-text">${escapeHtml(esv[verseId] || "")}</span>`;
     head.title = "Go to this verse";
-    head.addEventListener("click", () => jumpToVerse(verseId));
+    head.addEventListener("click", () => {
+      selectOnly(".xconn-verse-head", head);
+      jumpToVerse(verseId);
+    });
     block.appendChild(head);
 
     visible.slice(0, LINKS_PER_VERSE).forEach((link) => block.appendChild(buildXrefLink(link)));
@@ -1604,6 +1661,8 @@ els.form.addEventListener("submit", (e) => {
   const ref = els.input.value.trim();
   if (ref) loadPassage(ref);
 });
+
+initThemeToggle();
 
 document.querySelectorAll(".example").forEach((btn) => {
   btn.addEventListener("click", () => {
