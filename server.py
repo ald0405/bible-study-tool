@@ -12,7 +12,6 @@ time, merges:
   - a curated key-terms glossary
   - NLTK-based repeated word/phrase analysis
   - who is the subject of each verb, its voice and mood (see agency.py)
-  - an on-demand, Claude-written summary of all of the above (see summary.py)
 
 Run with `make run` (after `make setup`).
 """
@@ -32,7 +31,6 @@ import discourse
 import esv_html
 import niv
 import sentiment
-import summary
 import termanalysis
 from booknames import REVERSE_ALIASES
 
@@ -782,63 +780,10 @@ class Handler(BaseHTTPRequestHandler):
                 # (the weak tier), fetched only when the drawer asks to show them
                 wanted = [r for r in query.get("refs", [""])[0].split(";") if r.strip()]
                 self._send_json({r: crossref_text(r) for r in wanted[:40]})
-            elif parsed.path == "/api/summary":
-                ref = self._summary_ref(query)
-                if not ref:
-                    return
-                stored = summary.load(DATA_DIR, ref)
-                if stored:
-                    self._send_json({"status": "ready", "summary": stored})
-                elif summary.is_pending(DATA_DIR, ref):
-                    self._send_json({"status": "pending"})
-                else:
-                    self._send_json({"status": "none"})
             else:
                 self._send_json({"error": "not found"}, status=404)
         except FileNotFoundError:
             self._send_json({"error": "not found"}, status=404)
-
-    def do_POST(self):
-        """Only /api/summary, which is a POST rather than a flag on GET because
-        it writes a request file — a state change, not a lookup."""
-        parsed = urllib.parse.urlparse(self.path)
-        query = urllib.parse.parse_qs(parsed.query)
-
-        if parsed.path != "/api/summary":
-            self._send_json({"error": "not found"}, status=404)
-            return
-
-        ref = self._summary_ref(query)
-        if not ref:
-            return
-
-        stored = summary.load(DATA_DIR, ref)
-        if stored:  # already written — nothing to run
-            self._send_json({"status": "ready", "summary": stored})
-            return
-
-        try:
-            payload = build_passage_response(ref)
-        except Exception as exc:  # noqa: BLE001
-            self._send_json({"error": str(exc)}, status=502)
-            return
-
-        # With an API key set this is one round trip; without one (the default)
-        # we fall back to the file handoff and a Claude Code session finishes
-        # the job via /summarise. A failed API call falls back the same way
-        # rather than dead-ending the panel.
-        if summary.api_key():
-            try:
-                result = summary.generate(ref, payload)
-                summary.save(DATA_DIR, ref, result)
-                summary.clear_request(DATA_DIR, ref)
-                self._send_json({"status": "ready", "summary": result})
-                return
-            except Exception as exc:  # noqa: BLE001
-                print(f"[!] Summary API call failed ({exc}); falling back to a request file.")
-
-        request_file = summary.write_request(DATA_DIR, ref, payload)
-        self._send_json({"status": "pending", "request_file": request_file})
 
     def _within_chapter_cap(self, ref):
         """Sends the 400 itself and returns False if the span is too wide."""
@@ -850,22 +795,9 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def _summary_ref(self, query):
-        """Shared by both summary verbs. Sends the 400 itself and returns None
-        if the reference doesn't parse, so callers just bail on a falsy result."""
-        raw = query.get("ref", [""])[0]
-        ref = parse_reference(raw)
-        if not ref:
-            self._send_json({"error": f"Could not understand reference '{raw}'"}, status=400)
-            return None
-        if not self._within_chapter_cap(ref):
-            return None
-        return ref
-
 
 def main():
     os.makedirs(CACHE_DIR, exist_ok=True)
-    os.makedirs(summary.summary_dir(DATA_DIR), exist_ok=True)
     server = ThreadingHTTPServer(("localhost", PORT), Handler)
     print(f"Bible study tool running at http://localhost:{PORT}")
     try:
