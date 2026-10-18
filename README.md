@@ -39,11 +39,6 @@ annotation you can turn on or off:
 - A key terms glossary matches around 40 hand curated Hebrew and Greek
   theological terms (grace, covenant, agape, and so on) against whatever
   passage you are reading.
-- A summary panel pulls all of the above together into a short synthesis:
-  the passage's real sections, its recurring themes, why it reaches for the
-  scriptures it quotes, and two or three statements of what it is trying to
-  get you to believe. This one is written by Claude on request rather than
-  computed, and nothing runs until you press the button (see below).
 
 All the sidebar panels are collapsible, closed by default, and show a count
 so you know there is something worth opening before you click.
@@ -218,12 +213,11 @@ four API round trips per chapter, and a single chapter can be large on its own
 - **Paragraphs and poetry** come from the ESV's own markup, which the app was
   previously parsing and discarding: `<p>` for Crossway's paragraphing,
   `<p class="block-indent">` plus `<span class="indent line">` for poetry and
-  its indent levels. That matters because the app already had three competing
-  answers to "where are the sections" — the NIV publisher's headings, the
-  discourse-marker breaks, and the summary — and was missing the one actually
-  present in the text. For Ephesians 1 the paragraphs are 1, 2, 3-10, 11-14
-  and 15-23; the 3-10 / 11-14 boundary is real and none of the other three
-  could see it. The other translations carry their own poetry markers from
+  its indent levels. That matters because the app already had two competing
+  answers to "where are the sections" — the NIV publisher's headings and the
+  discourse-marker breaks — and was missing the one actually present in the
+  text. For Ephesians 1 the paragraphs are 1, 2, 3-10, 11-14 and 15-23; the
+  3-10 / 11-14 boundary is real and neither of the other two could see it. The other translations carry their own poetry markers from
   bible.helloao.org, so a psalm reads as verse in every column rather than one
   column of poetry beside four of prose.
 - **Multi-chapter passages** work because a verse is identified by
@@ -233,54 +227,6 @@ four API round trips per chapter, and a single chapter can be large on its own
   numbers. One thing this buys beyond the obvious: a publisher section
   heading that straddles a boundary (Romans 9:30-10:21, say) can finally be
   shown whole instead of clipped at the chapter line.
-- **The summary** is the one panel that is not computed locally, because it
-  cannot be. Everything else here is traceable: a tone score points back at
-  the words that drove it, a section break points at the discourse marker
-  that opened it. But "why does Paul reach for Psalm 8 here" and "he wants
-  us to believe X so that Y" are interpretive claims, not counts, so the
-  summary is written by Claude from the metadata the other panels already
-  show. It is labelled as interpretation in the panel itself, and it is the
-  only thing in the app you have to ask for.
-
-## The summary panel
-
-There is no Anthropic API key in this project, and a web page cannot reach
-Claude without one. So pressing **Run summary** does not call anything. It
-writes a request bundle to `data/summary_requests/`, containing the passage
-text plus everything the other panels computed, and the panel then waits.
-
-To answer it, run `/summarise` in a Claude Code session in this directory.
-That reads every pending request, writes the summary to `data/summaries/`,
-and deletes the request. The browser polls every few seconds, so the panel
-fills itself in without a reload.
-
-```
-Browser                    Disk                 Claude Code
-  [Run] ──────▶ data/summary_requests/EPH_1.json
-                      │
-                      │        you run: /summarise
-                      │                   │
-                      │◀───── reads ──────┤
-                      │                   │
-        data/summaries/EPH_1.json ◀──── writes
-      │
- poll ◀┘
- panel fills in ✓
-```
-
-Each passage is only ever generated once. Summaries are kept in
-`data/summaries/`, deliberately outside `data/cache/`, so `make clean` does
-not throw away work that took a human in the loop to produce, and so they
-can be committed and shared.
-
-The request bundle carries **BSB** text rather than ESV, on purpose: it is a
-file written to disk, and this app never persists ESV text (see above).
-
-If you do have an Anthropic API key, put `ANTHROPIC_API_KEY` in `.env` and
-install the SDK (`uv add anthropic`). The server then generates the summary
-in one round trip and the Run button becomes a single click, using the same
-brief and the same on-disk format, so summaries made either way are
-interchangeable.
 
 ## Project layout
 
@@ -292,10 +238,8 @@ termanalysis.py          repeated word and phrase detection (NLTK)
 discourse.py            discourse marker detection
 sentiment.py            tone analysis (NLTK VADER)
 agency.py               subject, voice and mood of every verb (spaCy)
-summary.py              passage summaries: request bundles, storage, optional API path
 booknames.py            book name and abbreviation parsing
-data/                   glossary, discourse marker bank, book list, on disk cache, summaries
-.claude/skills/summarise/  the /summarise brief Claude Code follows to write summaries
+data/                   glossary, discourse marker bank, book list, on disk cache
 static/                 the frontend (plain HTML, CSS, and JavaScript, no build step)
 scripts/setup_data.py    one time NLTK download, run by `make setup`
 ```
@@ -304,5 +248,4 @@ scripts/setup_data.py    one time NLTK download, run by `make setup`
 
 - `.env` holds your API keys and is gitignored. Never commit it.
 - `make clean` clears the on disk translation cache (`data/cache/`) if you
-  want to force a refresh. Summaries live in `data/summaries/`, outside the
-  cache, so they survive it.
+  want to force a refresh.
